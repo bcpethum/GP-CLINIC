@@ -1,4 +1,4 @@
-# DocWallet - GP Clinic Patient Management System
+# GP CLINIC -  Patient Management System
 
 A high-fidelity Patient Management System designed for clinical operations, patient registration, prescription tracking, inventory management, lab investigations tracing, and practice financial analytics.
 
