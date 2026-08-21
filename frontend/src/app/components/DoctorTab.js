@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronDown, ChevronUp, Plus, Trash2, Printer, Check, RefreshCw, QrCode, Camera, Calendar, FileText } from 'lucide-react';
 import QrCanvas from './QrCanvas';
+import PrintDocumentModal from './PrintDocumentModal';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { getSavedPrescriptionConfig, buildPrescriptionHtml, formatPatientAge } from '../lib/prescriptionConfig';
@@ -117,6 +118,9 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   const { user } = useAuth();
   // Live statistics (Top Right)
   const [dailyStats, setDailyStats] = useState({ count: 0, total: 0 });
+
+  // Print document modal
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Patients in queue
   const [queue, setQueue] = useState([]);
@@ -543,38 +547,13 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     }
   };
 
-  const handlePrintPrescription = async () => {
-    let qrImageSrc = '';
-    if (qrCodeData) {
-      try {
-        const QRCode = (await import('qrcode')).default;
-        qrImageSrc = await QRCode.toDataURL(qrCodeData);
-      } catch (err) {
-        console.error('Error generating print QR:', err);
-      }
-    }
-
-    const prescriptionConfig = getSavedPrescriptionConfig(user?.id);
-    const ageFormatted = formatPatientAge(ageY, ageM);
-
-    const htmlContent = buildPrescriptionHtml({
-      config: prescriptionConfig,
-      patientName: searchName || 'Walk-in Patient',
-      ageText: ageFormatted,
-      allergies: allergiesText,
-      visitDate: visitDateText,
-      queueNumber: activeVisit ? activeVisit.queue_number : 1,
-      prescriptions: prescribedDrugs,
-      qrImageSrc,
-      planOfAction: nextVisitPlan
-    });
-
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+  const handlePrintPrescription = () => {
+    // Open the print document selection modal
+    setShowPrintModal(true);
   };
 
   return (
+    <>
     <div className="grid-container fade-in" style={{
       gridTemplateColumns: 'repeat(12, 1fr)',
       padding: '12px 4px',
@@ -1283,7 +1262,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
             {/* Action buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button className="btn btn-secondary" onClick={handlePrintPrescription}>
-                <Printer size={16} /> Print Prescription
+                <Printer size={16} /> Print
               </button>
               <button className="btn btn-primary" onClick={handleConfirmAndSend}>
                 <Check size={16} /> Confirm & Send
@@ -1295,5 +1274,26 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
       </div>
 
     </div>
+
+    {/* Print Document Selection Modal */}
+    <PrintDocumentModal
+      isOpen={showPrintModal}
+      onClose={() => setShowPrintModal(false)}
+      userId={user?.id}
+      patientName={searchName}
+      ageY={ageY}
+      ageM={ageM}
+      visitDate={visitDateText}
+      queueNumber={activeVisit ? activeVisit.queue_number : 1}
+      prescriptions={prescribedDrugs}
+      diagnosis={diagnosis}
+      nextVisitPlan={nextVisitPlan}
+      consultationFee={effectiveConsultFee}
+      totalBill={totalBill}
+      isFoc={isFoc}
+      investigations={{ fbc, fbs, lipid_profile: lipidProfile, ufr, crp, esr, dengue_ns1: dengueNs1, influenza_ag: influenzaAg, lft, tft, rft }}
+      qrCodeData={qrCodeData}
+    />
+  </>
   );
 }
