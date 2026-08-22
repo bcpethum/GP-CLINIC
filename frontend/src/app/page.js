@@ -10,6 +10,7 @@ import PatientsTab from './components/PatientsTab';
 import DrugsTab from './components/DrugsTab';
 import DashboardTab from './components/DashboardTab';
 import SettingsTab from './components/SettingsTab';
+import SmsTab from './components/SmsTab';
 import { MessageSquare, AlertCircle, HelpCircle, Loader } from 'lucide-react';
 import { API_BASE } from './lib/api';
 
@@ -144,18 +145,7 @@ function AppContent() {
       case 'dashboard':
         return <DashboardTab API_BASE={API_BASE} showAlert={showAlert} showConfirm={showConfirm} />;
       case 'sms':
-        return (
-          <div className="glass-panel fade-in" style={{ maxWidth: '800px', margin: '40px auto', textAlign: 'center', padding: '40px' }}>
-            <MessageSquare size={64} style={{ color: 'var(--color-secondary)', marginBottom: '20px', opacity: 0.8 }} />
-            <h2 style={{ fontSize: '1.6rem', marginBottom: '10px' }}>SMS Communication Hub</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Send visit reminders, vaccination alerts, and queue updates directly to patient mobile numbers.
-            </p>
-            <div style={{ display: 'inline-block', background: 'rgba(0,0,0,0.15)', padding: '15px 30px', borderRadius: '8px', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }}>
-              Status: <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>Ready for Twilio / SMS Gateway credentials integration</span>
-            </div>
-          </div>
-        );
+        return <SmsTab API_BASE={API_BASE} showAlert={showAlert} />;
       case 'settings':
         return <SettingsTab API_BASE={API_BASE} showAlert={showAlert} showConfirm={showConfirm} user={user} />;
       default:

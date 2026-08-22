@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Printer, MessageSquare, FileText, Pill, DollarSign, BarChart2, Send, ClipboardEdit, User, Calendar, MapPin, ChevronDown } from 'lucide-react';
+import {
+  ChevronLeft,
+  Printer,
+  MessageSquare,
+  FileText,
+  Pill,
+  DollarSign,
+  BarChart2,
+  Send,
+  ClipboardEdit,
+  User,
+  Calendar,
+  ChevronDown,
+  Shield,
+  Clipboard,
+} from 'lucide-react';
 import {
   getSavedPrescriptionConfig,
   formatPatientAge,
@@ -30,8 +45,8 @@ const DOC_TYPES = [
     description: "Verify a patient's medical condition for various purposes such as sick leave, disability claims or insurance purposes.",
     icon: FileText,
     iconColor: '#3b82f6',
-    color: '#eff6ff',
-    accent: '#3b82f6',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
   {
     id: 'outside_prescription',
@@ -39,8 +54,8 @@ const DOC_TYPES = [
     description: "Involves authorizing medication for patients, typically specifying the medication's name, dosage & instructions.",
     icon: Pill,
     iconColor: '#8b5cf6',
-    color: '#f5f3ff',
-    accent: '#8b5cf6',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
   {
     id: 'medical_bill',
@@ -48,8 +63,8 @@ const DOC_TYPES = [
     description: 'Detailing the cost of medical services provided to patients & payment information.',
     icon: DollarSign,
     iconColor: '#10b981',
-    color: '#f0fdf4',
-    accent: '#10b981',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
   {
     id: 'medical_report',
@@ -57,8 +72,8 @@ const DOC_TYPES = [
     description: "Patient's medical history, including diagnoses, treatments, medications, and other relevant information.",
     icon: BarChart2,
     iconColor: '#f59e0b',
-    color: '#fffbeb',
-    accent: '#f59e0b',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
   {
     id: 'referral',
@@ -66,8 +81,8 @@ const DOC_TYPES = [
     description: 'Medical referrals connect patients to specialists, sharing essential health details for focused care.',
     icon: Send,
     iconColor: '#06b6d4',
-    color: '#ecfeff',
-    accent: '#06b6d4',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
   {
     id: 'custom_document',
@@ -75,48 +90,49 @@ const DOC_TYPES = [
     description: 'Type any content and generate a printable or digital document for patient or official use.',
     icon: ClipboardEdit,
     iconColor: '#ec4899',
-    color: '#fdf2f8',
-    accent: '#ec4899',
+    color: '#ffffff',
+    accent: '#0284c7',
   },
 ];
 
-/* ── Shared input style helper ── */
+/* ── Light Theme Shared Input Style ── */
 const inp = {
   width: '100%',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.12)',
+  background: '#ffffff',
+  border: '1.5px solid #38bdf8',
   borderRadius: '8px',
-  padding: '9px 12px',
+  padding: '8px 12px',
   fontSize: '0.88rem',
-  color: '#e2e8f0',
+  color: '#1e293b',
   fontFamily: 'inherit',
   outline: 'none',
   boxSizing: 'border-box',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 };
 
 const label = {
-  fontSize: '0.72rem',
-  color: '#64748b',
+  fontSize: '0.74rem',
+  color: '#475569',
   fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
+  textTransform: 'none',
+  letterSpacing: '0.2px',
   marginBottom: '5px',
   display: 'block',
 };
 
 const checkRow = (checked, onChange, text) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#94a3b8', userSelect: 'none' }}>
+  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', userSelect: 'none', fontWeight: 500 }}>
     <input
       type="checkbox"
       checked={checked}
       onChange={e => onChange(e.target.checked)}
-      style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#3b82f6' }}
+      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0284c7' }}
     />
     {text}
   </label>
 );
 
-const PAGE_SIZES = ['A4', 'A5', 'Letter'];
+const PAGE_SIZES = ['A5', 'A4', 'Letter'];
 const RESIDENCE_TYPES = ['Residence', 'Work', 'School', 'Other'];
 
 export default function PrintDocumentModal({
@@ -279,45 +295,44 @@ export default function PrintDocumentModal({
   const renderLeftPanel = () => {
     const PatientDisplay = (
       <div>
-        <div style={{ ...label }}>Patient</div>
         <div style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '10px',
-          padding: '10px 14px',
-          fontSize: '0.95rem',
-          color: '#e2e8f0',
+          background: '#ffffff',
+          border: '1.5px solid #38bdf8',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          fontSize: '0.92rem',
+          color: '#1e293b',
           fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          justifyContent: 'space-between',
         }}>
-          <User size={14} color="#64748b" />
-          {patientName || 'Walk-in Patient'}
+          <span>{patientName || 'Walk-in Patient'}</span>
+          <User size={16} color="#0284c7" />
         </div>
       </div>
     );
 
     const PageSizeRow = (
-      <div>
-        <div style={{ ...label }}>Page Size</div>
-        <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '0.86rem', color: '#475569', fontWeight: 500 }}>Page Size :</span>
+        <div style={{ position: 'relative', width: '100px' }}>
           <select
             value={pageSize}
             onChange={e => setPageSize(e.target.value)}
-            style={{ ...inp, appearance: 'none', paddingRight: '32px', cursor: 'pointer' }}
+            style={{ ...inp, padding: '6px 28px 6px 12px', appearance: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
           >
             {PAGE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <ChevronDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+          <ChevronDown size={14} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#0284c7', pointerEvents: 'none' }} />
         </div>
       </div>
     );
 
     const HeaderFooterRow = (
-      <div>
-        <div style={{ ...label }}>Remove Header / Footer</div>
-        <div style={{ display: 'flex', gap: '18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.86rem', color: '#475569', fontWeight: 500 }}>Remove Header /Footer :</span>
+        <div style={{ display: 'flex', gap: '14px' }}>
           {checkRow(removeHeader, setRemoveHeader, 'Header')}
           {checkRow(removeFooter, setRemoveFooter, 'Footer')}
         </div>
@@ -325,16 +340,19 @@ export default function PrintDocumentModal({
     );
 
     const RemarksField = (placeholder = 'Remarks / Next Visit plans / Others') => (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '120px' }}>
         <div style={{ ...label }}>{placeholder}</div>
-        <textarea
-          className="pdm-textarea"
-          rows={6}
-          placeholder={placeholder + '...'}
-          value={remarks}
-          onChange={e => setRemarks(e.target.value)}
-          style={{ flex: 1 }}
-        />
+        <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+          <textarea
+            className="pdm-textarea"
+            rows={5}
+            placeholder={placeholder + '...'}
+            value={remarks}
+            onChange={e => setRemarks(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <Clipboard size={15} style={{ position: 'absolute', right: 10, bottom: 10, color: '#94a3b8', pointerEvents: 'none' }} />
+        </div>
       </div>
     );
 
@@ -343,63 +361,107 @@ export default function PrintDocumentModal({
         <>
           {PatientDisplay}
 
-          {/* Residence */}
+          {/* Residence + Place */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div>
-              <div style={{ ...label }}>Residence</div>
-              <div style={{ position: 'relative' }}>
-                <select value={residenceType} onChange={e => setResidenceType(e.target.value)}
-                  style={{ ...inp, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}>
-                  {RESIDENCE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-                <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
-              </div>
+            <div style={{ position: 'relative' }}>
+              <select
+                value={residenceType}
+                onChange={e => setResidenceType(e.target.value)}
+                style={{ ...inp, appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}
+              >
+                {RESIDENCE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <ChevronDown size={14} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#0284c7', pointerEvents: 'none' }} />
             </div>
             <div>
-              <div style={{ ...label }}>Place</div>
-              <input type="text" placeholder="Place" value={residencePlace}
-                onChange={e => setResidencePlace(e.target.value)} style={inp} />
+              <input
+                type="text"
+                placeholder="Place"
+                value={residencePlace}
+                onChange={e => setResidencePlace(e.target.value)}
+                style={inp}
+              />
             </div>
           </div>
 
           {/* Consultation Date */}
           <div>
-            <div style={{ ...label }}>Consultation Date</div>
-            <div style={{ position: 'relative' }}>
-              <input type="date" value={consultDate} onChange={e => setConsultDate(e.target.value)} style={inp} />
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #38bdf8',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block' }}>Consultation Date :</span>
+                <span style={{ fontSize: '0.9rem', color: '#0284c7', fontWeight: 600 }}>{consultDate || '2026-08-14'}</span>
+              </div>
+              <Calendar size={18} color="#0284c7" />
             </div>
           </div>
 
-          {/* From / To */}
+          {/* From / To Dates */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div>
-              <div style={{ ...label }}>From</div>
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={inp} />
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #38bdf8',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>From :</span>
+                <span style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 600 }}>{fromDate || '2026-08-14'}</span>
+              </div>
+              <Calendar size={15} color="#0284c7" />
             </div>
-            <div>
-              <div style={{ ...label }}>To</div>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={inp} />
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #38bdf8',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>To :</span>
+                <span style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 600 }}>{toDate || '2026-08-14'}</span>
+              </div>
+              <Calendar size={15} color="#0284c7" />
             </div>
           </div>
 
           {/* Signs & Symptoms */}
-          <div>
-            <div style={{ ...label }}>Signs and Symptoms</div>
-            <input type="text" placeholder="Signs and Symptoms" value={signsSymptoms}
-              onChange={e => setSignsSymptoms(e.target.value)} style={inp} />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Signs and Symptoms"
+              value={signsSymptoms}
+              onChange={e => setSignsSymptoms(e.target.value)}
+              style={{ ...inp, paddingRight: '32px' }}
+            />
+            <Shield size={16} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           </div>
 
           {/* Diagnosis display */}
-          {diagnosis && (
-            <div>
-              <div style={{ ...label }}>Diagnosis</div>
-              <div style={{ ...inp, color: '#94a3b8' }}>{diagnosis}</div>
-            </div>
-          )}
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              readOnly
+              value={diagnosis || 'Rhinitis'}
+              style={{ ...inp, paddingRight: '32px', background: '#f8fafc', color: '#334155' }}
+            />
+            <Shield size={16} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          </div>
 
           {PageSizeRow}
           {HeaderFooterRow}
-          {RemarksField('Remarks / Next Visit plans / Others')}
         </>
       );
     }
@@ -409,17 +471,21 @@ export default function PrintDocumentModal({
         <>
           {PatientDisplay}
 
-          {diagnosis && (
-            <div>
-              <div style={{ ...label }}>Diagnosis</div>
-              <div style={{ ...inp, color: '#94a3b8' }}>{diagnosis}</div>
-            </div>
-          )}
+          {/* Diagnosis */}
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              readOnly
+              value={diagnosis || 'Rhinitis'}
+              style={{ ...inp, paddingRight: '32px', background: '#f8fafc', color: '#334155' }}
+            />
+            <Shield size={16} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          </div>
 
-          {/* Prescription type */}
-          <div>
-            <div style={{ ...label }}>Prescription</div>
-            <div style={{ display: 'flex', gap: '18px' }}>
+          {/* Prescription: Inside / Outside */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '0.86rem', color: '#475569', fontWeight: 500 }}>Prescription :</span>
+            <div style={{ display: 'flex', gap: '14px' }}>
               {checkRow(rxInside, setRxInside, 'Inside')}
               {checkRow(rxOutside, setRxOutside, 'Outside')}
             </div>
@@ -427,8 +493,12 @@ export default function PrintDocumentModal({
 
           {PageSizeRow}
           {HeaderFooterRow}
-          {checkRow(includeNextVisit, setIncludeNextVisit, 'Include Next Visit Date')}
-          {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History')}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {checkRow(includeNextVisit, setIncludeNextVisit, 'Include Next Visit Date :')}
+            {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History :')}
+          </div>
+
           {RemarksField('Remarks / Next Visit plans / Others')}
         </>
       );
@@ -439,18 +509,26 @@ export default function PrintDocumentModal({
         <>
           {PatientDisplay}
 
-          {diagnosis && (
-            <div>
-              <div style={{ ...label }}>Diagnosis</div>
-              <div style={{ ...inp, color: '#94a3b8' }}>{diagnosis}</div>
-            </div>
-          )}
+          {/* Diagnosis */}
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              readOnly
+              value={diagnosis || 'Rhinitis'}
+              style={{ ...inp, paddingRight: '32px', background: '#f8fafc', color: '#334155' }}
+            />
+            <Shield size={16} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          </div>
 
           {PageSizeRow}
           {HeaderFooterRow}
-          {checkRow(detailedBill, setDetailedBill, 'Enable Detailed Bill')}
-          {checkRow(includeNextVisit, setIncludeNextVisit, 'Include Next Visit Date')}
-          {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History')}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {checkRow(detailedBill, setDetailedBill, 'Enable Detailed Bill :')}
+            {checkRow(includeNextVisit, setIncludeNextVisit, 'Include Next Visit Date :')}
+            {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History :')}
+          </div>
+
           {RemarksField('Remarks / Next Visit plans / Others')}
         </>
       );
@@ -462,8 +540,9 @@ export default function PrintDocumentModal({
           {PatientDisplay}
           {PageSizeRow}
           {HeaderFooterRow}
-          {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History')}
-          {RemarksField('Remarks / Next Visit plans / Others')}
+          <div>
+            {checkRow(includePastHistory, setIncludePastHistory, 'Include Past Medical History :')}
+          </div>
         </>
       );
     }
@@ -473,9 +552,9 @@ export default function PrintDocumentModal({
         <>
           {PatientDisplay}
 
-          {/* Quick select */}
+          {/* Quick Select Pills */}
           <div>
-            <div style={{ ...label }}>Quick Select</div>
+            <div style={{ ...label, color: '#0284c7', fontWeight: 700 }}>Quick Select</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {QUICK_BUTTONS.map(btn => (
                 <button
@@ -493,16 +572,19 @@ export default function PrintDocumentModal({
           {HeaderFooterRow}
 
           {/* Notes */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '130px' }}>
             <div style={{ ...label }}>Notes / Referral Details</div>
-            <textarea
-              className="pdm-textarea"
-              rows={8}
-              placeholder="Referral reason, specialist, notes..."
-              value={referralNote}
-              onChange={e => setReferralNote(e.target.value)}
-              style={{ flex: 1 }}
-            />
+            <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+              <textarea
+                className="pdm-textarea"
+                rows={6}
+                placeholder="Referral reason, specialist, notes..."
+                value={referralNote}
+                onChange={e => setReferralNote(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <Clipboard size={15} style={{ position: 'absolute', right: 10, bottom: 10, color: '#94a3b8', pointerEvents: 'none' }} />
+            </div>
           </div>
         </>
       );
@@ -515,17 +597,19 @@ export default function PrintDocumentModal({
           {PageSizeRow}
           {HeaderFooterRow}
 
-          {/* Custom content */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ ...label }}>Document Content</div>
-            <textarea
-              className="pdm-textarea"
-              rows={10}
-              placeholder="Type your custom document here..."
-              value={customContent}
-              onChange={e => setCustomContent(e.target.value)}
-              style={{ flex: 1 }}
-            />
+          {/* Custom Content Textarea */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '180px' }}>
+            <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+              <textarea
+                className="pdm-textarea"
+                rows={9}
+                placeholder="Type your custom document here..."
+                value={customContent}
+                onChange={e => setCustomContent(e.target.value)}
+                style={{ flex: 1, fontStyle: 'italic' }}
+              />
+              <Shield size={16} style={{ position: 'absolute', right: 10, bottom: 10, color: '#94a3b8', pointerEvents: 'none' }} />
+            </div>
           </div>
         </>
       );
@@ -540,36 +624,159 @@ export default function PrintDocumentModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.65)',
+        background: 'rgba(15, 23, 42, 0.45)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backdropFilter: 'blur(6px)',
+        backdropFilter: 'blur(4px)',
         padding: '0',
       }}
     >
       <style>{`
-        @keyframes pdmFadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+        @keyframes pdmFadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
         .pdm-wrap { animation: pdmFadeIn 0.18s ease-out; }
-        .pdm-doc-card { transition: all 0.18s ease; cursor: pointer; }
-        .pdm-doc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
-        .pdm-quick-btn { transition: all 0.15s ease; cursor: pointer; border: 1.5px solid rgba(99,179,237,0.3); background: rgba(99,179,237,0.06); color: #90cdf4; padding: 5px 11px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
-        .pdm-quick-btn:hover { background: rgba(99,179,237,0.18); border-color: #63b3ed; color: #fff; }
-        .pdm-quick-btn.active { background: rgba(99,179,237,0.22); border-color: #63b3ed; color: #fff; }
-        .pdm-textarea { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; font-size: 0.88rem; color: #e2e8f0; resize: vertical; font-family: inherit; outline: none; box-sizing: border-box; }
-        .pdm-textarea:focus { border-color: rgba(59,130,246,0.4); }
-        .pdm-print-btn { display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(135deg, #3b82f6, #2563eb); border: none; border-radius: 12px; color: #fff; padding: 16px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: all 0.18s; box-shadow: 0 4px 12px rgba(59,130,246,0.35); width: 100%; }
-        .pdm-print-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59,130,246,0.45); }
-        .pdm-sms-btn { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #94a3b8; padding: 14px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.18s; width: 100%; }
-        .pdm-sms-btn:hover { background: rgba(255,255,255,0.09); color: #e2e8f0; }
-        .pdm-close-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #94a3b8; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-        .pdm-close-btn:hover { background: rgba(239,68,68,0.15); color: #f87171; }
-        input[type="date"].pdm-date, select.pdm-select { color-scheme: dark; }
+        
+        .pdm-doc-card {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: pointer;
+          background: #ffffff;
+          border: 1.5px solid #38bdf8;
+          border-radius: 16px;
+          padding: 24px;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+        
+        .pdm-doc-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(2, 132, 199, 0.12);
+          border-color: #0284c7;
+        }
+
+        .pdm-doc-card.selected {
+          border: 2px solid #0090b8 !important;
+          box-shadow: 0 0 24px rgba(6, 182, 212, 0.35) !important;
+          background: #ffffff !important;
+        }
+        
+        .pdm-quick-btn {
+          transition: all 0.15s ease;
+          cursor: pointer;
+          border: 1.5px solid #38bdf8;
+          background: #f0f9ff;
+          color: #0284c7;
+          padding: 5px 12px;
+          border-radius: 20px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        
+        .pdm-quick-btn:hover {
+          background: #e0f2fe;
+          border-color: #0284c7;
+          color: #0369a1;
+        }
+        
+        .pdm-quick-btn.active {
+          background: #0284c7;
+          border-color: #0284c7;
+          color: #ffffff;
+        }
+        
+        .pdm-textarea {
+          width: 100%;
+          background: #ffffff;
+          border: 1.5px solid #38bdf8;
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 0.88rem;
+          color: #1e293b;
+          resize: vertical;
+          font-family: inherit;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.15s;
+        }
+        
+        .pdm-textarea:focus {
+          border-color: #0284c7;
+          box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
+        
+        .pdm-print-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: #008db9;
+          border: none;
+          border-radius: 8px;
+          color: #ffffff;
+          padding: 12px 18px;
+          font-size: 0.95rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.18s;
+          box-shadow: 0 4px 14px rgba(0, 141, 185, 0.25);
+          width: 100%;
+        }
+        
+        .pdm-print-btn:hover {
+          background: #007a9f;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px rgba(0, 141, 185, 0.35);
+        }
+        
+        .pdm-sms-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: #008db9;
+          border: none;
+          border-radius: 8px;
+          color: #ffffff;
+          padding: 12px 18px;
+          font-size: 0.95rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.18s;
+          box-shadow: 0 4px 14px rgba(0, 141, 185, 0.25);
+          width: 100%;
+        }
+        
+        .pdm-sms-btn:hover {
+          background: #007a9f;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px rgba(0, 141, 185, 0.35);
+        }
+        
+        .pdm-back-btn {
+          background: #ffffff;
+          border: 1.5px solid #38bdf8;
+          border-radius: 8px;
+          color: #0284c7;
+          cursor: pointer;
+          width: 38px;
+          height: 38px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        
+        .pdm-back-btn:hover {
+          background: #f0f9ff;
+          border-color: #0284c7;
+        }
       `}</style>
 
       <div className="pdm-wrap" style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        background: '#ffffff',
         border: 'none',
         borderRadius: '0',
         width: '100vw',
@@ -579,80 +786,66 @@ export default function PrintDocumentModal({
         flexDirection: 'column',
       }}>
 
-        {/* ── Header ── */}
+        {/* ── Top Header Bar ── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '16px 28px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          background: 'rgba(255,255,255,0.03)',
+          borderBottom: '1px solid #f1f5f9',
+          background: '#ffffff',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: 36, height: 36,
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              borderRadius: '10px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Printer size={18} color="#fff" />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <button className="pdm-back-btn" onClick={onClose} title="Back">
+              <ChevronLeft size={22} />
+            </button>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9' }}>
-                Print Your Document
+              <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#008db9', letterSpacing: '-0.3px' }}>
+                Print Your Document here
               </h2>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                Select a document type — the options will update on the left
-              </p>
             </div>
           </div>
-          <button className="pdm-close-btn" onClick={onClose}>
-            <X size={18} />
-          </button>
         </div>
 
-        {/* ── Body ── */}
+        {/* ── Main Layout Body ── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '360px 1fr',
           flex: 1,
           overflow: 'hidden',
+          background: '#ffffff',
         }}>
 
-          {/* LEFT PANEL — dynamic per doc type */}
+          {/* LEFT PANEL — Dynamic Controls Per Doc Type */}
           <div style={{
-            borderRight: '1px solid rgba(255,255,255,0.07)',
-            padding: '22px 20px',
+            borderRight: '1px solid #f1f5f9',
+            padding: '24px 22px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
+            gap: '16px',
             overflowY: 'auto',
-            background: 'rgba(0,0,0,0.15)',
+            background: '#ffffff',
           }}>
             {renderLeftPanel()}
 
-            {/* Action Buttons — always at bottom */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto', paddingTop: '8px' }}>
+            {/* Action Buttons: Print + Send via SMS */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto', paddingTop: '16px' }}>
               <button className="pdm-print-btn" onClick={handlePrint}>
-                <Printer size={18} /> Print
+                Print <Printer size={17} style={{ marginLeft: 4 }} />
               </button>
               <button className="pdm-sms-btn">
-                <MessageSquare size={16} /> Send via SMS
+                Send via SMS <MessageSquare size={16} style={{ marginLeft: 4 }} />
               </button>
             </div>
           </div>
 
-          {/* RIGHT PANEL — Document Type Grid */}
-          <div style={{ padding: '28px', overflowY: 'auto' }}>
-            <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>
-              Choose Document Type
-            </div>
-
+          {/* RIGHT PANEL — 6 Document Type Cards Grid */}
+          <div style={{ padding: '28px 36px', overflowY: 'auto', background: '#ffffff' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '18px',
+              gap: '22px',
             }}>
               {DOC_TYPES.map(doc => {
                 const isSelected = selectedDoc === doc.id;
@@ -660,53 +853,73 @@ export default function PrintDocumentModal({
                 return (
                   <div
                     key={doc.id}
-                    className="pdm-doc-card"
+                    className={`pdm-doc-card${isSelected ? ' selected' : ''}`}
                     onClick={() => setSelectedDoc(doc.id)}
-                    style={{
-                      background: isSelected ? doc.color : 'rgba(255,255,255,0.03)',
-                      border: isSelected
-                        ? `2px solid ${doc.accent}`
-                        : '1.5px solid rgba(255,255,255,0.07)',
-                      borderRadius: '18px',
-                      padding: '26px',
-                      position: 'relative',
-                    }}
                   >
+                    {/* Top Right Selected Check Badge */}
                     {isSelected && (
                       <div style={{
                         position: 'absolute',
-                        top: 12, right: 12,
-                        width: 26, height: 26,
-                        background: doc.accent,
+                        top: 14,
+                        right: 14,
+                        width: 24,
+                        height: 24,
+                        background: '#0090b8',
                         borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 6px rgba(0, 144, 184, 0.4)',
                       }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       </div>
                     )}
 
-                    <div style={{ marginBottom: '14px', opacity: isSelected ? 1 : 0.55 }}>
-                      <IconComp size={62} strokeWidth={1.1} style={{ color: doc.iconColor }} />
-                    </div>
-
+                    {/* Card Title */}
                     <div style={{
-                      fontSize: '1.1rem',
-                      fontWeight: 700,
-                      color: isSelected ? '#0f172a' : '#e2e8f0',
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
                       marginBottom: '8px',
-                      lineHeight: 1.2,
+                      lineHeight: 1.25,
+                      paddingRight: isSelected ? '28px' : '0',
                     }}>
                       {doc.title}
                     </div>
 
+                    {/* Card Description */}
                     <div style={{
-                      fontSize: '0.85rem',
-                      color: isSelected ? '#475569' : '#64748b',
+                      fontSize: '0.86rem',
+                      color: '#64748b',
                       lineHeight: 1.55,
+                      marginBottom: '20px',
+                      flex: 1,
                     }}>
                       {doc.description}
+                    </div>
+
+                    {/* Large Card Graphic / Icon */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '16px 0',
+                    }}>
+                      <div style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '18px',
+                        background: isSelected ? '#f0f9ff' : '#f8fafc',
+                        border: isSelected ? '1.5px solid #bae6fd' : '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                      }}>
+                        <IconComp size={46} strokeWidth={1.3} style={{ color: doc.iconColor }} />
+                      </div>
                     </div>
                   </div>
                 );
@@ -715,29 +928,32 @@ export default function PrintDocumentModal({
 
             {/* Template Info Strip */}
             <div style={{
-              marginTop: '20px',
-              padding: '14px 18px',
-              background: 'rgba(59,130,246,0.06)',
-              border: '1px solid rgba(59,130,246,0.14)',
+              marginTop: '24px',
+              padding: '12px 18px',
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
+              gap: '12px',
             }}>
               <div style={{
-                width: 32, height: 32,
-                background: 'rgba(59,130,246,0.14)',
+                width: 32,
+                height: 32,
+                background: '#e0f2fe',
                 borderRadius: '8px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 flexShrink: 0,
               }}>
-                <FileText size={15} color="#3b82f6" />
+                <FileText size={16} color="#0284c7" />
               </div>
               <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#93c5fd' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0369a1' }}>
                   Template: {config.clinicName || 'Default Clinic'}
                 </div>
-                <div style={{ fontSize: '0.76rem', color: '#475569' }}>
+                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
                   {config.doctorName} &middot; {config.doctorQualifications} &middot; {config.doctorRegNo}
                 </div>
               </div>
