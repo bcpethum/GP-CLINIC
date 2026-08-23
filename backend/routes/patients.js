@@ -59,6 +59,124 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ── GET /api/patients/active ───────────────────────────────────────────────
+// Returns ALL patients who had at least one visit within the last N months.
+// Query params:
+//   ?months=1   → patients who visited in the last 1 month
+//   ?months=3   → patients who visited in the last 3 months
+//   (no param)  → all patients who ever visited
+router.get('/active', async (req, res) => {
+  try {
+    const doctorId = await getDoctorId(req);
+    const { months } = req.query;
+
+    let queryText;
+    let params;
+
+    if (months) {
+      queryText = `
+        SELECT DISTINCT ON (p.id)
+          p.id,
+          p.name        AS patient_name,
+          p.telephone   AS tel_no,
+          p.age,
+          v.visit_date,
+          v.next_visit_date,
+          v.next_visit_plan AS visit_plan
+        FROM visits v
+        JOIN patients p ON p.id = v.patient_id
+        WHERE v.doctor_id = $1
+          AND v.visit_date >= CURRENT_DATE - ($2 || ' months')::INTERVAL
+        ORDER BY p.id, v.visit_date DESC
+      `;
+      params = [doctorId, parseInt(months)];
+    } else {
+      // All patients ever seen by this doctor
+      queryText = `
+        SELECT DISTINCT ON (p.id)
+          p.id,
+          p.name        AS patient_name,
+          p.telephone   AS tel_no,
+          p.age,
+          v.visit_date,
+          v.next_visit_date,
+          v.next_visit_plan AS visit_plan
+        FROM visits v
+        JOIN patients p ON p.id = v.patient_id
+        WHERE v.doctor_id = $1
+        ORDER BY p.id, v.visit_date DESC
+      `;
+      params = [doctorId];
+    }
+
+    const result = await db.query(queryText, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[active-patients]', err);
+    res.status(500).json({ error: 'Database error loading active patients' });
+  }
+});
+
+// ── GET /api/patients/next-visits ─────────────────────────────────────────
+// Returns patients who have a scheduled next visit date.
+// Query params:
+//   ?date=YYYY-MM-DD   → only patients with next_visit_date = that date
+//   (no param)         → all patients with any future or past next_visit_date
+router.get('/next-visits', async (req, res) => {
+  try {
+    const doctorId = await getDoctorId(req);
+    const { date } = req.query;
+
+    let queryText;
+    let params;
+
+    if (date) {
+      // Filter by specific date (today / tomorrow)
+      queryText = `
+        SELECT DISTINCT ON (p.id)
+          p.id,
+          p.name          AS patient_name,
+          p.telephone     AS tel_no,
+          p.age,
+          v.next_visit_date,
+          v.next_visit_plan AS visit_plan,
+          v.visit_date
+        FROM visits v
+        JOIN patients p ON p.id = v.patient_id
+        WHERE v.doctor_id = $1
+          AND v.next_visit_date = $2::date
+          AND v.next_visit_date IS NOT NULL
+        ORDER BY p.id, v.next_visit_date ASC
+      `;
+      params = [doctorId, date];
+    } else {
+      // All patients with any next_visit_date set
+      queryText = `
+        SELECT DISTINCT ON (p.id)
+          p.id,
+          p.name          AS patient_name,
+          p.telephone     AS tel_no,
+          p.age,
+          v.next_visit_date,
+          v.next_visit_plan AS visit_plan,
+          v.visit_date
+        FROM visits v
+        JOIN patients p ON p.id = v.patient_id
+        WHERE v.doctor_id = $1
+          AND v.next_visit_date IS NOT NULL
+        ORDER BY p.id, v.next_visit_date ASC
+      `;
+      params = [doctorId];
+    }
+
+    const result = await db.query(queryText, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[next-visits]', err);
+    res.status(500).json({ error: 'Database error loading next visits' });
+  }
+});
+
 // 10. Delete a patient and all associated records
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;

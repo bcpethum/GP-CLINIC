@@ -122,7 +122,7 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Daily Patient Count</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#fff', marginTop: '4px' }}>{metrics.patient_count}</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--color-primary)', marginTop: '4px' }}>{metrics.patient_count}</div>
           </div>
         </div>
 
@@ -180,7 +180,7 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
       }}>
         {/* Logger Panel */}
         <div className="glass-panel" style={{ gridColumn: 'span 4' }}>
-          <h4 style={{ fontSize: '1.1rem', marginBottom: '15px', color: '#fff', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
+          <h4 style={{ fontSize: '1.1rem', marginBottom: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
             Log New Cost / Expenditure
           </h4>
 
@@ -236,7 +236,7 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
         {/* Expenditures list Table */}
         <div className="glass-panel" style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', padding: 0 }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ fontSize: '1.1rem', color: '#fff' }}>Expenditures Register</h4>
+            <h4 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Expenditures Register</h4>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Date: {selectedDate}</span>
           </div>
 
