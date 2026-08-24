@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, ChevronUp, Plus, Trash2, Printer, Check, RefreshCw, QrCode, Camera, Calendar, FileText } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Plus, Trash2, Printer, Check, RefreshCw, QrCode, Camera, Calendar, FileText, ExternalLink, Copy, X, ArrowRight } from 'lucide-react';
 import QrCanvas from './QrCanvas';
 import PrintDocumentModal from './PrintDocumentModal';
 import { apiFetch } from '../lib/api';
@@ -156,6 +156,11 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   const [showLastVisitDropdown, setShowLastVisitDropdown] = useState(false);
   const [showLabsDropdown, setShowLabsDropdown] = useState(false);
   const [showNextVisitDropdown, setShowNextVisitDropdown] = useState(false);
+
+  // All Visits modal & expanded visit card state
+  const [showAllVisitsModal, setShowAllVisitsModal] = useState(false);
+  const [expandedVisitId, setExpandedVisitId] = useState(null);
+  const [modalExpandedVisitId, setModalExpandedVisitId] = useState(null);
 
   // History of active patient
   const [history, setHistory] = useState([]);
@@ -552,6 +557,42 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     setShowPrintModal(true);
   };
 
+  // Print a historical visit's prescription directly
+  const handlePrintHistoryVisit = (visit) => {
+    const config = getSavedPrescriptionConfig(user?.id);
+    const ageText = formatPatientAge(ageY, ageM);
+    const visitDate = visit.visit_date ? new Date(visit.visit_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const html = buildPrescriptionHtml({
+      config,
+      patientName: searchName || selectedPatient?.name || 'Patient',
+      ageText,
+      allergies: allergiesText,
+      visitDate,
+      queueNumber: visit.id,
+      prescriptions: visit.prescriptions || [],
+      planOfAction: visit.next_visit_plan || ''
+    });
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  };
+
+  // Load a historical visit's prescription into the current form
+  const handleRepeatPrescription = (visit) => {
+    if (visit.prescriptions && visit.prescriptions.length > 0) {
+      setPrescribedDrugs(visit.prescriptions.map(p => ({
+        drug_id: p.drug_id || null,
+        medicine_name: p.medicine_name,
+        dosage: p.dosage,
+        duration_days: p.duration_days,
+        price: parseFloat(p.price) || 0
+      })));
+      if (visit.diagnosis) setDiagnosis(visit.diagnosis);
+      showAlert(`Loaded ${visit.prescriptions.length} medicine(s) from visit on ${new Date(visit.visit_date).toLocaleDateString()}`, 'Prescription Repeated');
+    } else {
+      showAlert('No prescriptions found in this visit.', 'Nothing to Load');
+    }
+  };
+
   return (
     <>
     <div className="grid-container fade-in" style={{
@@ -879,40 +920,152 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           )}
         </div>
 
-        {/* Last Visit Details Dropdown */}
+        {/* Last Visit Details Dropdown - Enhanced */}
         <div className="glass-panel" style={{ padding: '14px 20px' }}>
           <div
-            onClick={() => setShowLastVisitDropdown(!showLastVisitDropdown)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
           >
-            <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Last Visit Details & History</span>
-            {showLastVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <div
+              onClick={() => setShowLastVisitDropdown(!showLastVisitDropdown)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}
+            >
+              <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Last Visit Details &amp; History</span>
+              {history.length > 0 && (
+                <span style={{
+                  fontSize: '0.7rem', background: 'var(--accent-blue-bg)', color: 'var(--color-secondary)',
+                  padding: '2px 8px', borderRadius: '10px', fontWeight: '600'
+                }}>{history.length} visit{history.length !== 1 ? 's' : ''}</span>
+              )}
+              {showLastVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </div>
+            {/* All Visits button */}
+            <button
+              onClick={() => setShowAllVisitsModal(true)}
+              disabled={history.length === 0}
+              style={{
+                background: 'none', border: '1px solid var(--glass-border)', borderRadius: '6px',
+                padding: '4px 10px', cursor: history.length === 0 ? 'not-allowed' : 'pointer',
+                color: history.length === 0 ? 'var(--text-muted)' : 'var(--color-secondary)',
+                fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px',
+                opacity: history.length === 0 ? 0.5 : 1, transition: 'all 0.2s'
+              }}
+              title="View all visits"
+            >
+              <ExternalLink size={13} /> All Visits
+            </button>
           </div>
 
           {showLastVisitDropdown && (
-            <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ marginTop: '12px', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '2px' }}>
               {history.length === 0 ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px' }}>No previous visit records found.</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', textAlign: 'center' }}>No previous visit records found.</div>
               ) : (
-                history.map((h, i) => (
-                  <div key={h.id} style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', fontSize: '0.85rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', marginBottom: '6px' }}>
-                      <strong style={{ color: 'var(--color-secondary)' }}>{new Date(h.visit_date).toLocaleDateString()}</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Visit #{h.id}</span>
-                    </div>
-                    <p style={{ marginBottom: '5px' }}><strong>Diagnosis:</strong> {h.diagnosis || 'General Checkup'}</p>
-                    {h.prescriptions && h.prescriptions.length > 0 && (
-                      <div>
-                        <strong>Medication:</strong>
-                        <ul style={{ paddingLeft: '15px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                          {h.prescriptions.map((rx, idx) => (
-                            <li key={idx}>{rx.medicine_name} - {rx.dosage} ({rx.duration_days} days)</li>
-                          ))}
-                        </ul>
+                history.map((h, i) => {
+                  const isExpanded = expandedVisitId === h.id;
+                  const visitDate = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                  const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                  return (
+                    <div key={h.id} style={{
+                      background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.15)',
+                      border: i === 0 ? '1px solid rgba(0,153,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                      borderRadius: '10px', fontSize: '0.85rem', overflow: 'hidden'
+                    }}>
+                      {/* Visit card header */}
+                      <div style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              width: '8px', height: '8px', borderRadius: '50%',
+                              background: i === 0 ? '#10b981' : '#64748b', display: 'inline-block', flexShrink: 0
+                            }} />
+                            <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{visitDate}</strong>
+                            {i === 0 && (
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '1px 6px', borderRadius: '6px', fontWeight: '700' }}>LAST VISIT</span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
+                        </div>
+
+                        <div style={{ marginBottom: '8px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                            <strong style={{ color: 'var(--text-primary)' }}>Diagnosis:</strong> {h.diagnosis || 'General Checkup'}
+                          </span>
+                        </div>
+
+                        {/* Expandable prescription table */}
+                        {hasMeds && (
+                          <div>
+                            <button
+                              onClick={() => setExpandedVisitId(isExpanded ? null : h.id)}
+                              style={{
+                                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
+                                color: 'var(--text-secondary)', fontSize: '0.75rem',
+                                display: 'flex', alignItems: 'center', gap: '4px', marginBottom: isExpanded ? '8px' : '0'
+                              }}
+                            >
+                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              {h.prescriptions.length} Medicine(s)
+                            </button>
+
+                            {isExpanded && (
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '4px' }}>
+                                <thead>
+                                  <tr style={{ background: 'rgba(0,153,255,0.08)', borderBottom: '1px solid rgba(0,153,255,0.15)' }}>
+                                    <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Drug</th>
+                                    <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Dosage</th>
+                                    <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Durat..</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {h.prescriptions.map((rx, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: '500' }}>{rx.medicine_name}</td>
+                                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--color-secondary)' }}>{rx.dosage}</td>
+                                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{rx.duration_days}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                          <button
+                            onClick={() => handlePrintHistoryVisit(h)}
+                            style={{
+                              flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '6px', padding: '6px 8px', cursor: 'pointer',
+                              color: 'var(--text-secondary)', fontSize: '0.75rem',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                              transition: 'all 0.2s'
+                            }}
+                            title="Print this prescription"
+                          >
+                            <Printer size={12} /> Print
+                          </button>
+                          <button
+                            onClick={() => handleRepeatPrescription(h)}
+                            disabled={!hasMeds}
+                            style={{
+                              flex: 2, background: hasMeds ? 'rgba(0,153,255,0.12)' : 'rgba(0,0,0,0.1)',
+                              border: `1px solid ${hasMeds ? 'rgba(0,153,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                              borderRadius: '6px', padding: '6px 10px', cursor: hasMeds ? 'pointer' : 'not-allowed',
+                              color: hasMeds ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.75rem',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                              opacity: hasMeds ? 1 : 0.5, transition: 'all 0.2s'
+                            }}
+                            title="Use this prescription for current visit"
+                          >
+                            <Copy size={12} /> Use this Prescription
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -1294,6 +1447,194 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
       investigations={{ fbc, fbs, lipid_profile: lipidProfile, ufr, crp, esr, dengue_ns1: dengueNs1, influenza_ag: influenzaAg, lft, tft, rft }}
       qrCodeData={qrCodeData}
     />
+
+    {/* All Visits Modal */}
+    {showAllVisitsModal && (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+      }} onClick={(e) => { if (e.target === e.currentTarget) setShowAllVisitsModal(false); }}>
+        <div style={{
+          background: '#ffffff', border: '1px solid #e2e8f0',
+          borderRadius: '18px', width: '100%', maxWidth: '900px', maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '0 30px 90px rgba(0,0,0,0.35)'
+        }}>
+          {/* Modal Header */}
+          <div style={{
+            padding: '22px 28px', borderBottom: '1px solid #e2e8f0',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: '#f8fafc'
+          }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.35rem', color: '#0f172a', fontWeight: '800' }}>All Visits</h3>
+              {selectedPatient && (
+                <p style={{ margin: '4px 0 0', fontSize: '0.95rem', color: '#64748b' }}>
+                  {selectedPatient.name} &mdash; {history.length} visit{history.length !== 1 ? 's' : ''} recorded
+                </p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => { if (selectedPatient) fetchPatientHistory(selectedPatient.id); }}
+                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
+                title="Refresh history"
+              >
+                <RefreshCw size={14} />
+              </button>
+              <button
+                onClick={() => setShowAllVisitsModal(false)}
+                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Body - All visits list */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff' }}>
+            {history.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>No visit records found for this patient.</div>
+            ) : (
+              history.map((h, i) => {
+                const isExp = modalExpandedVisitId === h.id;
+                const visitDateStr = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                const config = getSavedPrescriptionConfig(user?.id);
+                const refNo = `${config.refPrefix || 'DW'}/${new Date(h.visit_date).getFullYear().toString().slice(2)}${String(new Date(h.visit_date).getMonth()+1).padStart(2,'0')}${String(new Date(h.visit_date).getDate()).padStart(2,'0')}/${h.id}`;
+                return (
+                  <div key={h.id} style={{
+                    background: i === 0 ? '#f0f9ff' : '#f8fafc',
+                    border: i === 0 ? '1px solid #bae6fd' : '1px solid #e2e8f0',
+                    borderRadius: '12px', overflow: 'hidden'
+                  }}>
+                    {/* Row header */}
+                    <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: '800', fontSize: '1.15rem', color: '#0f172a' }}>{visitDateStr}</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: '1rem', fontWeight: '700',
+                          color: '#1e293b', background: '#e2e8f0',
+                          padding: '5px 14px', borderRadius: '8px'
+                        }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
+                        {/* Row action buttons */}
+                        <button
+                          onClick={() => handlePrintHistoryVisit(h)}
+                          style={{
+                            background: '#f1f5f9', border: '1px solid #cbd5e1',
+                            borderRadius: '8px', padding: '8px 14px', cursor: 'pointer',
+                            color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.9rem'
+                          }}
+                          title="Print prescription for this visit"
+                        >
+                          <Printer size={16} />
+                        </button>
+                        <button
+                          onClick={() => { handleRepeatPrescription(h); setShowAllVisitsModal(false); }}
+                          disabled={!hasMeds}
+                          style={{
+                            background: hasMeds ? '#0ea5e9' : '#f1f5f9',
+                            border: `1px solid ${hasMeds ? '#0284c7' : '#e2e8f0'}`,
+                            borderRadius: '8px', padding: '8px 16px', cursor: hasMeds ? 'pointer' : 'not-allowed',
+                            color: hasMeds ? '#ffffff' : '#94a3b8',
+                            fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px',
+                            opacity: hasMeds ? 1 : 0.6, fontWeight: '700'
+                          }}
+                          title="Repeat this prescription for current visit"
+                        >
+                          <Copy size={13} /> Repeat this Prescription for this visit
+                        </button>
+                        <button
+                          onClick={() => setModalExpandedVisitId(isExp ? null : h.id)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#475569', padding: '4px'
+                          }}
+                        >
+                          {isExp ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expandable diagnosis + meds */}
+                    {isExp && (
+                      <div style={{ padding: '0 22px 20px', borderTop: '1px solid #e2e8f0' }}>
+                        {/* Diagnosis pill/badge row */}
+                        <div style={{
+                          background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0',
+                          padding: '16px 18px', marginTop: '16px', marginBottom: '16px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                            <span style={{ fontWeight: '700', fontSize: '1rem', color: '#0f172a' }}>
+                              Diagnosis : {h.diagnosis || 'General Checkup'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              fontSize: '0.85rem', fontWeight: '700', background: '#dbeafe',
+                              color: '#1d4ed8', padding: '5px 14px', borderRadius: '8px'
+                            }}>Ref : {refNo}</span>
+                            {config.signatoryName && (
+                              <span style={{
+                                fontSize: '0.85rem', fontWeight: '700', background: '#d1fae5',
+                                color: '#065f46', padding: '5px 14px', borderRadius: '8px'
+                              }}>Reviewed by : {config.signatoryName}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Medicine table */}
+                        {hasMeds ? (
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f1f5f9' }}>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#64748b', fontStyle: 'italic', fontWeight: '700', fontSize: '0.9rem' }}>Drug</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontWeight: '700', fontSize: '0.9rem' }}>Dosage</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontWeight: '700', fontSize: '0.9rem' }}>Durat..</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {h.prescriptions.map((rx, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '12px 16px', color: '#1e293b', fontWeight: '600', fontSize: '1rem' }}>{rx.medicine_name}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: '#0284c7', fontWeight: '800', fontSize: '1rem' }}>{rx.dosage}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: '#475569', fontSize: '1rem', fontWeight: '600' }}>{rx.duration_days}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p style={{ color: '#94a3b8', fontSize: '0.95rem', padding: '10px 14px' }}>No prescription recorded for this visit.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <div style={{
+            padding: '14px 24px', borderTop: '1px solid #e2e8f0',
+            display: 'flex', justifyContent: 'flex-end', background: '#f8fafc'
+          }}>
+            <button
+              onClick={() => setShowAllVisitsModal(false)}
+              style={{
+                padding: '8px 32px', fontSize: '0.95rem', fontWeight: '600',
+                background: '#0ea5e9', color: '#ffffff', border: 'none',
+                borderRadius: '8px', cursor: 'pointer'
+              }}
+            >
+              Ok
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </>
   );
 }
