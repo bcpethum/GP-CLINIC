@@ -39,6 +39,7 @@ const expendituresRouter = require('./routes/expenditures');
 const assistantsRouter = require('./routes/assistants');
 const settingsRouter = require('./routes/settings');
 const smsRouter = require('./routes/sms');
+const documentsRouter = require('./routes/documents');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mount routes
@@ -51,6 +52,7 @@ app.use('/api/queue', queueRouter);
 app.use('/api/drugs', drugsRouter);
 app.use('/api/expenditures', expendituresRouter);
 app.use('/api/sms', smsRouter);             // Protected: SMS proxy (credentials never exposed)
+app.use('/api/documents', documentsRouter); // Mixed: share doc (protected POST, public GET)
 
 // Health check endpoint
 app.get('/health', (req, res) => {
