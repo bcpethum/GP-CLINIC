@@ -31,7 +31,7 @@ import {
   buildReferralLetterHtml,
   buildCustomDocumentHtml,
 } from '../lib/prescriptionConfig';
-import { API_BASE } from '../lib/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const QUICK_BUTTONS = [
   { label: 'Referral', type: 'Referral' },
