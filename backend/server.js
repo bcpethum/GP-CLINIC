@@ -8,9 +8,26 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enable CORS for frontend accessibility (Next.js client)
-// Allow Authorization header for JWT Bearer tokens
+// Strips trailing slashes so env var typos don't break it
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, Render health checks)
+    if (!origin) return callback(null, true);
+    // Strip trailing slash from incoming origin before comparing
+    const cleanOrigin = origin.replace(/\/$/, '');
+    // Allow any vercel.app preview URL for this project
+    const isVercel = cleanOrigin.endsWith('.vercel.app');
+    if (isVercel || allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+    callback(new Error(`CORS: Origin ${origin} not allowed`));
+  },
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));

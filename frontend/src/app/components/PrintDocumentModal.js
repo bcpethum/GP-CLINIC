@@ -31,6 +31,7 @@ import {
   buildReferralLetterHtml,
   buildCustomDocumentHtml,
 } from '../lib/prescriptionConfig';
+import { API_BASE } from '../lib/api';
 
 const QUICK_BUTTONS = [
   { label: 'Referral', type: 'Referral' },
@@ -342,7 +343,7 @@ export default function PrintDocumentModal({
       setShareLoading(true);
       setSharePopup(null);
       const token = localStorage.getItem('gp_clinic_token');
-      const res = await fetch('http://localhost:5000/api/documents/share', {
+      const res = await fetch(`${API_BASE}/documents/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
@@ -413,7 +414,7 @@ export default function PrintDocumentModal({
       const authToken = localStorage.getItem('gp_clinic_token');
 
       // Step 1: Generate shareable link
-      const linkRes = await fetch('http://localhost:5000/api/documents/share', {
+      const linkRes = await fetch(`${API_BASE}/documents/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ html: shareHtml, doc_type: selectedDoc, patient_name: patientName || 'Walk-in Patient', expiry_hours: 48 }),
@@ -428,7 +429,7 @@ export default function PrintDocumentModal({
       const docTypeLabel = { outside_prescription: 'Prescription', medical_certificate: 'Medical Certificate', medical_bill: 'Medical Bill', medical_report: 'Medical Report', referral: 'Referral Letter', custom_document: 'Document' }[selectedDoc] || 'Document';
       const smsText = `Your ${docTypeLabel} from ${config.clinicName || 'GP Clinic'} is ready. View here: ${linkData.url} (Link valid 48 hrs)`;
 
-      const smsRes = await fetch('http://localhost:5000/api/sms/send', {
+      const smsRes = await fetch(`${API_BASE}/sms/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ contact: phone, message: smsText }),
