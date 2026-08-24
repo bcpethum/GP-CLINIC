@@ -71,8 +71,11 @@ router.post('/doctor/login', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Doctor login error:', err);
-    return res.status(500).json({ error: 'Server error during login.' });
+    console.error('Doctor login error:', err.message, err.code, err.stack);
+    return res.status(500).json({
+      error: 'Server error during login.',
+      detail: process.env.NODE_ENV !== 'production' ? err.message : err.code || 'DB_ERROR'
+    });
   }
 });
 
