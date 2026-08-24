@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: gp-clinic-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # Set manually in Render dashboard (Neon connection string)
+      - key: JWT_SECRET
+        sync: false          # Set manually in Render dashboard
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: FRONTEND_URL
+        sync: false          # Set to your Vercel URL after deploying frontend
+      - key: BACKEND_PUBLIC_URL
+        sync: false          # Set to your Render service URL e.g. https://gp-clinic-backend.onrender.com
+      - key: SMSLENZ_USER_ID
+        sync: false
+      - key: SMSLENZ_API_KEY
+        sync: false
+      - key: SMSLENZ_SENDER_ID
+        value: SMSlenzDEMO
