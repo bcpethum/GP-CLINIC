@@ -43,10 +43,27 @@ router.post('/share', authenticateToken, async (req, res) => {
 
     const { token, expires_at } = result.rows[0];
 
-    // Build the public URL — uses the backend server's own origin (strip any trailing slashes)
-    const rawBaseUrl = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const baseUrl = rawBaseUrl.replace(/\/+$/, '');
-    const url = `${baseUrl}/api/documents/share/${token}`;
+    // Build the public URL — robustly resolves protocol/host and strictly prevents double slashes
+    let baseUrl = process.env.BACKEND_PUBLIC_URL;
+    if (!baseUrl || !baseUrl.trim()) {
+      const host = req.get('x-forwarded-host') || req.get('host');
+      const proto = req.get('x-forwarded-proto') || (req.secure ? 'https' : 'http');
+      if (host) {
+        baseUrl = `${proto}://${host}`;
+      } else {
+        baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+      }
+    }
+
+    // Clean baseUrl: ensure protocol, trim whitespace, remove trailing slashes & trailing /api
+    baseUrl = baseUrl.trim();
+    if (!/^https?:\/\//i.test(baseUrl)) {
+      baseUrl = `https://${baseUrl}`;
+    }
+    baseUrl = baseUrl.replace(/\/+$/, '').replace(/\/api\/?$/i, '');
+
+    // Form share URL and strictly collapse any duplicate slashes in the path
+    const url = `${baseUrl}/api/documents/share/${token}`.replace(/([^:])\/{2,}/g, '$1/');
 
     res.json({ token, url, expires_at });
   } catch (err) {
@@ -80,7 +97,7 @@ router.get('/share/:token', async (req, res) => {
     }
 
     // Increment view count (fire-and-forget)
-    db.query('UPDATE shared_documents SET view_count = view_count + 1 WHERE token = $1', [token]).catch(() => {});
+    db.query('UPDATE shared_documents SET view_count = view_count + 1 WHERE token = $1', [token]).catch(() => { });
 
     // Strip the auto-print onload so it just renders (patient views, not auto-prints)
     const safeHtml = doc.html_content.replace(/(<body)[^>]*(>)/i, '$1$2');

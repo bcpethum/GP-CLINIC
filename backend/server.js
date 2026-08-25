@@ -32,10 +32,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Normalize double/duplicate leading slashes in URLs (e.g. //api/documents -> /api/documents)
+// Normalize double/duplicate slashes in URLs (e.g. //api/documents -> /api/documents)
 app.use((req, res, next) => {
-  if (req.url && req.url.startsWith('//')) {
-    req.url = req.url.replace(/^\/+/, '/');
+  if (req.url && req.url.includes('//')) {
+    req.url = req.url.replace(/\/{2,}/g, '/');
   }
   next();
 });
