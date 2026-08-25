@@ -32,13 +32,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Normalize double/duplicate slashes in URLs (e.g. //api/documents -> /api/documents)
-app.use((req, res, next) => {
-  if (req.url && req.url.includes('//')) {
-    req.url = req.url.replace(/\/{2,}/g, '/');
-  }
-  next();
-});
+
 
 // Parse incoming request JSON payloads
 app.use(express.json({ limit: '25mb' }));
