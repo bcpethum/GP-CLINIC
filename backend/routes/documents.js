@@ -43,8 +43,9 @@ router.post('/share', authenticateToken, async (req, res) => {
 
     const { token, expires_at } = result.rows[0];
 
-    // Build the public URL — uses the backend server's own origin
-    const baseUrl = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`;
+    // Build the public URL — uses the backend server's own origin (strip any trailing slashes)
+    const rawBaseUrl = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const baseUrl = rawBaseUrl.replace(/\/+$/, '');
     const url = `${baseUrl}/api/documents/share/${token}`;
 
     res.json({ token, url, expires_at });
