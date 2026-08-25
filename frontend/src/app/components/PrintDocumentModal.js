@@ -31,7 +31,7 @@ import {
   buildReferralLetterHtml,
   buildCustomDocumentHtml,
 } from '../lib/prescriptionConfig';
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 const QUICK_BUTTONS = [
   { label: 'Referral', type: 'Referral' },
@@ -389,7 +389,7 @@ export default function PrintDocumentModal({
       if (selectedDoc === 'outside_prescription') {
         let qrImageSrc = '';
         if (qrCodeData) {
-          try { const QRCode = (await import('qrcode')).default; qrImageSrc = await QRCode.toDataURL(qrCodeData); } catch {}
+          try { const QRCode = (await import('qrcode')).default; qrImageSrc = await QRCode.toDataURL(qrCodeData); } catch { }
         }
         htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, includePastHistory });
       } else if (selectedDoc === 'medical_certificate') {
@@ -1056,8 +1056,8 @@ export default function PrintDocumentModal({
                     <MessageSquare size={15} />
                     {smsStatus === 'generating' ? 'Generating link...'
                       : smsStatus === 'sending' ? 'Sending SMS...'
-                      : smsStatus === 'sent' ? '✓ Sent!'
-                      : 'Send SMS'}
+                        : smsStatus === 'sent' ? '✓ Sent!'
+                          : 'Send SMS'}
                   </button>
 
                   <div style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center' }}>
@@ -1157,37 +1157,53 @@ export default function PrintDocumentModal({
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
                         {[
-                          { label: 'WhatsApp', bg: '#25D366', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.555 4.12 1.524 5.854L.057 23.8a.5.5 0 0 0 .624.598l6.082-1.596A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.9 0-3.67-.535-5.176-1.46l-.371-.22-3.857 1.013 1.032-3.747-.243-.385A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-                          ), href: `https://wa.me/?text=${encodeURIComponent('Your medical document: ' + sharePopup.url)}` },
-                          { label: 'Facebook', bg: '#1877F2', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.027 4.388 11.02 10.125 11.927v-8.437H7.078v-3.49h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796v8.437C19.612 23.093 24 18.1 24 12.073z"/></svg>
-                          ), href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePopup.url)}` },
-                          { label: 'Twitter', bg: '#000000', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                          ), href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(sharePopup.url)}&text=${encodeURIComponent('Your medical document is ready:')}` },
-                          { label: 'Gmail', bg: '#EA4335', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.364l-6.545-4.636v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-.904.732-1.636 1.636-1.636h.749l9.615 6.818 9.615-6.818h.749A1.636 1.636 0 0 1 24 5.457z"/></svg>
-                          ), href: `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please find your medical document at: ' + sharePopup.url)}` },
-                          { label: 'LinkedIn', bg: '#0A66C2', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                          ), href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(sharePopup.url)}` },
-                          { label: 'Outlook', bg: '#0078D4', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M7.88 12.04q0 .45-.11.87-.1.41-.33.74-.22.33-.58.52-.37.2-.87.2t-.85-.2q-.35-.21-.57-.55-.22-.33-.33-.75-.1-.42-.1-.86t.1-.87q.1-.43.34-.76.22-.34.59-.54.36-.2.87-.2t.86.2q.35.21.57.55.22.34.31.77.1.43.1.88zM24 12v9.38q0 .46-.33.8-.33.32-.8.32H7.13q-.46 0-.8-.33-.32-.33-.32-.8V18H1q-.41 0-.7-.3-.3-.29-.3-.7V7q0-.41.3-.7Q.58 6 1 6h6.5V2.55q0-.44.3-.75.3-.3.75-.3h12.9q.44 0 .75.3.3.3.3.75V10.85l1.24.72h.01q.07.04.07.12l.13.31zM9.5 15.02l1.44-.7q.06-.03.06-.07 0-.04-.06-.06l-1.44-.69V15.02zm9.12-7.32H8.37v5.63l1.5.73q.19.09.19.32v2.47h8.56V7.7zm3.07 7.44l-2.5-1.43V9.14l2.5 1.43v4.57z"/></svg>
-                          ), href: `mailto:?subject=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please find your document here: ' + sharePopup.url)}` },
-                          { label: 'Windows\nShare', bg: '#737373', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92S19.61 16.08 18 16.08z"/></svg>
-                          ), href: null },
-                          { label: 'Mail app', bg: '#6366f1', icon: (
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-                          ), href: `mailto:?subject=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please open your document: ' + sharePopup.url)}` },
+                          {
+                            label: 'WhatsApp', bg: '#25D366', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" /><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.555 4.12 1.524 5.854L.057 23.8a.5.5 0 0 0 .624.598l6.082-1.596A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.9 0-3.67-.535-5.176-1.46l-.371-.22-3.857 1.013 1.032-3.747-.243-.385A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" /></svg>
+                            ), href: `https://wa.me/?text=${encodeURIComponent('Your medical document: ' + sharePopup.url)}`
+                          },
+                          {
+                            label: 'Facebook', bg: '#1877F2', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.027 4.388 11.02 10.125 11.927v-8.437H7.078v-3.49h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.49h-2.796v8.437C19.612 23.093 24 18.1 24 12.073z" /></svg>
+                            ), href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePopup.url)}`
+                          },
+                          {
+                            label: 'Twitter', bg: '#000000', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                            ), href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(sharePopup.url)}&text=${encodeURIComponent('Your medical document is ready:')}`
+                          },
+                          {
+                            label: 'Gmail', bg: '#EA4335', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.364l-6.545-4.636v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-.904.732-1.636 1.636-1.636h.749l9.615 6.818 9.615-6.818h.749A1.636 1.636 0 0 1 24 5.457z" /></svg>
+                            ), href: `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please find your medical document at: ' + sharePopup.url)}`
+                          },
+                          {
+                            label: 'LinkedIn', bg: '#0A66C2', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                            ), href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(sharePopup.url)}`
+                          },
+                          {
+                            label: 'Outlook', bg: '#0078D4', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M7.88 12.04q0 .45-.11.87-.1.41-.33.74-.22.33-.58.52-.37.2-.87.2t-.85-.2q-.35-.21-.57-.55-.22-.33-.33-.75-.1-.42-.1-.86t.1-.87q.1-.43.34-.76.22-.34.59-.54.36-.2.87-.2t.86.2q.35.21.57.55.22.34.31.77.1.43.1.88zM24 12v9.38q0 .46-.33.8-.33.32-.8.32H7.13q-.46 0-.8-.33-.32-.33-.32-.8V18H1q-.41 0-.7-.3-.3-.29-.3-.7V7q0-.41.3-.7Q.58 6 1 6h6.5V2.55q0-.44.3-.75.3-.3.75-.3h12.9q.44 0 .75.3.3.3.3.75V10.85l1.24.72h.01q.07.04.07.12l.13.31zM9.5 15.02l1.44-.7q.06-.03.06-.07 0-.04-.06-.06l-1.44-.69V15.02zm9.12-7.32H8.37v5.63l1.5.73q.19.09.19.32v2.47h8.56V7.7zm3.07 7.44l-2.5-1.43V9.14l2.5 1.43v4.57z" /></svg>
+                            ), href: `mailto:?subject=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please find your document here: ' + sharePopup.url)}`
+                          },
+                          {
+                            label: 'Windows\nShare', bg: '#737373', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92S19.61 16.08 18 16.08z" /></svg>
+                            ), href: null
+                          },
+                          {
+                            label: 'Mail app', bg: '#6366f1', icon: (
+                              <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" /></svg>
+                            ), href: `mailto:?subject=${encodeURIComponent('Your Medical Document')}&body=${encodeURIComponent('Please open your document: ' + sharePopup.url)}`
+                          },
                         ].map((item) => (
                           <button
                             key={item.label}
                             onClick={() => {
                               if (!item.href) {
                                 if (navigator.share) {
-                                  navigator.share({ title: 'Medical Document', url: sharePopup.url }).catch(() => {});
+                                  navigator.share({ title: 'Medical Document', url: sharePopup.url }).catch(() => { });
                                 } else {
                                   handleCopyLink();
                                 }
@@ -1230,7 +1246,7 @@ export default function PrintDocumentModal({
                             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                             transition: 'background 0.2s',
                           }}>
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H6l-2 2V4h16v10z"/></svg>
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="#fff"><path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H6l-2 2V4h16v10z" /></svg>
                           </div>
                           <span style={{
                             fontSize: '0.68rem', color: showSmsInModal ? '#0284c7' : '#475569',
@@ -1286,8 +1302,8 @@ export default function PrintDocumentModal({
                             <MessageSquare size={15} />
                             {smsStatus === 'generating' ? 'Generating link...'
                               : smsStatus === 'sending' ? 'Sending SMS...'
-                              : smsStatus === 'sent' ? '✓ Sent!'
-                              : 'Send SMS'}
+                                : smsStatus === 'sent' ? '✓ Sent!'
+                                  : 'Send SMS'}
                           </button>
                           <div style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center' }}>
                             The document link (valid 48 hrs) will be sent to this number
