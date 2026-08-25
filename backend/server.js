@@ -82,6 +82,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Run database migrations on start
+const runMigrations = require('./migrate');
+runMigrations().catch(err => console.error('Migration initialization error:', err));
+
 app.listen(PORT, () => {
   console.log(`GP Clinic (DocWallet) backend server running on port ${PORT}`);
 });

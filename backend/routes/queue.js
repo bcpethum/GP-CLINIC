@@ -319,8 +319,8 @@ router.get('/stats', authenticateToken, requirePermission('dashboard'), async (r
     const dailyIncome = parseFloat(incomeRes.rows[0].income || 0.00);
 
     const expenditureRes = await db.query(
-      'SELECT SUM(amount) AS expenditure FROM expenditures WHERE exp_date = $1',
-      [targetDate]
+      'SELECT SUM(amount) AS expenditure FROM expenditures WHERE exp_date = $1 AND (doctor_id = $2 OR doctor_id IS NULL)',
+      [targetDate, doctorId]
     );
     const dailyExpenditure = parseFloat(expenditureRes.rows[0].expenditure || 0.00);
 
