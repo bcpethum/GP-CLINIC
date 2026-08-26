@@ -172,19 +172,38 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
           })}
 
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ position: 'relative', width: '250px' }}>
+            <div style={{ position: 'relative', width: '320px' }}>
               <input
                 type="text"
-                className="input-glass"
                 placeholder="Search drug catalog..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   fetchDrugs(e.target.value);
                 }}
-                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                style={{
+                  width: '100%',
+                  padding: '10px 40px 10px 16px',
+                  fontSize: '0.95rem',
+                  borderRadius: '10px',
+                  border: '1.5px solid #d1d5db',
+                  background: '#ffffff',
+                  color: '#111827',
+                  outline: 'none',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={e => {
+                  e.target.style.borderColor = '#6366f1';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)';
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = '#d1d5db';
+                  e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
+                }}
               />
-              <Search size={14} style={{ position: 'absolute', right: '10px', top: '10px', color: 'var(--text-muted)' }} />
+              <Search size={16} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
             </div>
           </div>
         </div>

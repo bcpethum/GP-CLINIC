@@ -1225,47 +1225,78 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               <div style={{ flex: 1, position: 'relative' }}>
                 <input
                   type="text"
-                  className="input-glass"
                   placeholder="Search inventory drugs..."
                   value={drugSearch}
                   onChange={(e) => handleDrugSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 42px 11px 16px',
+                    fontSize: '1rem',
+                    borderRadius: '10px',
+                    border: '1.5px solid #d1d5db',
+                    background: '#ffffff',
+                    color: '#111827',
+                    outline: 'none',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#6366f1';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)';
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
+                  }}
                 />
-                <Search size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                <Search size={17} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
               </div>
 
               {/* Drug Search dropdown list */}
               {drugSearchResults.length > 0 && (
                 <div style={{
                   position: 'absolute',
-                  top: '46px',
+                  top: '50px',
                   left: 0,
                   right: 0,
-                  background: 'rgba(10, 20, 38, 0.98)',
-                  border: '1px solid var(--glass-border)',
-                  borderRadius: '8px',
-                  maxHeight: '180px',
+                  background: '#ffffff',
+                  border: '1.5px solid #e5e7eb',
+                  borderRadius: '10px',
+                  maxHeight: '200px',
                   overflowY: 'auto',
                   zIndex: 20,
                   display: 'flex',
-                  flexDirection: 'column'
+                  flexDirection: 'column',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                 }}>
                   {drugSearchResults.map(drug => (
                     <div
                       key={drug.id}
                       onClick={() => selectDrugFromLookup(drug)}
                       style={{
-                        padding: '8px 12px',
+                        padding: '10px 16px',
                         cursor: 'pointer',
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
-                        fontSize: '0.85rem',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '0.88rem',
                         display: 'flex',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        color: '#111827',
+                        transition: 'background 0.15s',
                       }}
-                      onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
-                      onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
                     >
-                      <span><strong>{drug.name}</strong> ({drug.type})</span>
-                      <span style={{ color: drug.stock < drug.notify_threshold ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                      <span><strong>{drug.name}</strong> <span style={{ color: '#6b7280', fontWeight: 400 }}>({drug.type})</span></span>
+                      <span style={{
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: drug.stock < drug.notify_threshold ? '#ef4444' : '#10b981',
+                        background: drug.stock < drug.notify_threshold ? '#fef2f2' : '#ecfdf5',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                      }}>
                         Stock: {drug.stock} | {drug.selling_price} LKR
                       </span>
                     </div>
