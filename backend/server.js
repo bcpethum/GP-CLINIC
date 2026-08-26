@@ -96,6 +96,39 @@ app.get('/migrate', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin: Inspect actual DB column names for all tables
+// Call: GET /db-info?secret=<MIGRATE_SECRET>
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/db-info', async (req, res) => {
+  const secret = process.env.MIGRATE_SECRET || 'gp-clinic-migrate';
+  if (req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const db = require('./db');
+    const tables = ['patients', 'visits', 'drugs', 'expenditures', 'prescriptions', 'investigations', 'users', 'clinic_settings', 'shared_documents'];
+    const info = {};
+    for (const table of tables) {
+      try {
+        const result = await db.query(
+          `SELECT column_name, data_type, is_nullable, column_default
+           FROM information_schema.columns
+           WHERE table_name = $1 AND table_schema = 'public'
+           ORDER BY ordinal_position`,
+          [table]
+        );
+        info[table] = result.rows;
+      } catch (e) {
+        info[table] = { error: e.message };
+      }
+    }
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('[Global Error]', err.message, err.stack);
