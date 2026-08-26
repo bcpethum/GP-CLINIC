@@ -5,10 +5,26 @@
 ALTER TABLE visits ADD COLUMN IF NOT EXISTS diagnosis TEXT;
 ALTER TABLE visits ADD COLUMN IF NOT EXISTS next_visit_date DATE;
 ALTER TABLE visits ADD COLUMN IF NOT EXISTS next_visit_plan TEXT;
-ALTER TABLE visits ADD COLUMN IF NOT EXISTS total_fee NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
-ALTER TABLE visits ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
-ALTER TABLE visits ADD COLUMN IF NOT EXISTS is_foc BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE visits ADD COLUMN IF NOT EXISTS total_fee NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE visits ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE visits ADD COLUMN IF NOT EXISTS is_foc BOOLEAN DEFAULT FALSE;
 ALTER TABLE visits ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- expenditures table: ensure exp_date column exists (production may have 'date' instead)
+ALTER TABLE expenditures ADD COLUMN IF NOT EXISTS exp_date DATE DEFAULT CURRENT_DATE;
+ALTER TABLE expenditures ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE expenditures ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Supplies';
+
+-- If 'date' column exists but exp_date is empty, copy from it
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'expenditures' AND column_name = 'date'
+  ) THEN
+    UPDATE expenditures SET exp_date = date::DATE WHERE exp_date IS NULL AND date IS NOT NULL;
+  END IF;
+END $$;
 
 -- prescriptions table
 CREATE TABLE IF NOT EXISTS prescriptions (
@@ -23,9 +39,9 @@ CREATE TABLE IF NOT EXISTS prescriptions (
 
 -- drugs table columns
 ALTER TABLE drugs ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE drugs ADD COLUMN IF NOT EXISTS buying_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
-ALTER TABLE drugs ADD COLUMN IF NOT EXISTS notify_threshold INTEGER NOT NULL DEFAULT 10;
-ALTER TABLE drugs ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS buying_price NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS notify_threshold INTEGER DEFAULT 10;
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT 0;
 
 -- patients table column
 ALTER TABLE patients ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
@@ -54,5 +70,7 @@ CREATE TABLE IF NOT EXISTS investigations (
 CREATE INDEX IF NOT EXISTS idx_patients_doctor_id ON patients(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_visits_doctor_id ON visits(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_drugs_doctor_id ON drugs(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_expenditures_doctor_id ON expenditures(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_expenditures_date ON expenditures(exp_date);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_visit ON prescriptions(visit_id);
 CREATE INDEX IF NOT EXISTS idx_investigations_patient ON investigations(patient_id);
