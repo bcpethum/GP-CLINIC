@@ -43,10 +43,13 @@ router.post('/share', authenticateToken, async (req, res) => {
 
     const { token, expires_at } = result.rows[0];
 
-    // Build the public URL — uses the backend server's own origin (strip any trailing slashes)
-    const rawBaseUrl = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const baseUrl = rawBaseUrl.replace(/\/+$/, '');
-    const url = `${baseUrl}/documents/share/${token}`;
+    // Build the public URL using API_URL (e.g. https://gp-clinic.onrender.com/api)
+    const rawApiUrl = process.env.API_URL || process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}/api`;
+    let apiUrl = rawApiUrl.trim().replace(/\/+$/, '');
+    if (!apiUrl.endsWith('/api')) {
+      apiUrl = `${apiUrl}/api`;
+    }
+    const url = `${apiUrl}/documents/share/${token}`;
 
     res.json({ token, url, expires_at });
   } catch (err) {

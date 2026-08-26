@@ -6,7 +6,8 @@ const MIGRATION_FILES = [
   '001_add_auth.sql',
   '002_add_settings.sql',
   '002_doctor_data_isolation.sql',
-  'add_shared_documents.sql'
+  'add_shared_documents.sql',
+  '003_ensure_schema.sql'
 ];
 
 async function runMigrations() {

@@ -17,7 +17,9 @@ services:
       - key: FRONTEND_URL
         sync: false          # Set to your Vercel URL after deploying frontend
       - key: BACKEND_PUBLIC_URL
-        sync: false          # Set to your Render service URL e.g. https://gp-clinic-backend.onrender.com
+        sync: false          # e.g. https://gp-clinic.onrender.com or https://gp-clinic.onrender.com/api
+      - key: API_URL
+        sync: false          # e.g. https://gp-clinic.onrender.com/api
       - key: SMSLENZ_USER_ID
         sync: false
       - key: SMSLENZ_API_KEY

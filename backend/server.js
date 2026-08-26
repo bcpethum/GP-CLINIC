@@ -78,10 +78,28 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date() });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin: Manually trigger database migrations (protected by secret key)
+// Call: GET /migrate?secret=<MIGRATE_SECRET>
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/migrate', async (req, res) => {
+  const secret = process.env.MIGRATE_SECRET || 'gp-clinic-migrate';
+  if (req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    await runMigrations();
+    res.json({ success: true, message: 'Migrations applied successfully' });
+  } catch (err) {
+    console.error('Manual migration error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('[Global Error]', err.message, err.stack);
+  res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
 // Run database migrations on start

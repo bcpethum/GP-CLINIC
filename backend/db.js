@@ -3,9 +3,16 @@ require('dotenv').config();
 
 const connectionString = process.env.DATABASE_URL;
 
+// Neon and other cloud Postgres providers require SSL even in development.
+// Only skip SSL if explicitly connecting to localhost.
+const isLocalDb = connectionString && (
+  connectionString.includes('localhost') ||
+  connectionString.includes('127.0.0.1')
+);
+
 const pool = new Pool({
   connectionString: connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: isLocalDb ? false : { rejectUnauthorized: false },
 });
 
 pool.on('connect', () => {
