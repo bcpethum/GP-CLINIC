@@ -43,13 +43,11 @@ router.post('/share', authenticateToken, async (req, res) => {
 
     const { token, expires_at } = result.rows[0];
 
-    // Build the public URL using API_URL (e.g. https://gp-clinic.onrender.com/api)
-    const rawApiUrl = process.env.API_URL || process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}/api`;
-    let apiUrl = rawApiUrl.trim().replace(/\/+$/, '');
-    if (!apiUrl.endsWith('/api')) {
-      apiUrl = `${apiUrl}/api`;
-    }
-    const url = `${apiUrl}/documents/share/${token}`;
+    // Build share URL using request host headers — always correct regardless of env vars.
+    // Render automatically sets x-forwarded-proto=https and host=gp-clinic.onrender.com
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host  = req.headers['x-forwarded-host']  || req.headers['host']  || `localhost:${process.env.PORT || 5000}`;
+    const url = `${proto}://${host}/api/documents/share/${token}`;
 
     res.json({ token, url, expires_at });
   } catch (err) {
