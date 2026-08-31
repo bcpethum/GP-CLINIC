@@ -199,17 +199,14 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
   };
 
   return (
-    <div className="grid-container fade-in" style={{
-      gridTemplateColumns: 'repeat(12, 1fr)',
-      padding: '12px 4px',
-      maxWidth: '1400px',
-      margin: '0 auto',
-      gap: '20px'
-    }}>
+    <div className="tab-panel-wrapper fade-in">
+
+      {/* Two-column content area */}
+      <div className="tab-two-col">
 
       {/* LEFT COLUMN: Patient search list */}
-      <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="glass-panel" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+      <div className="tab-left-col">
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <h3 style={{ fontSize: '1.2rem', marginBottom: '15px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Patients Directory</span>
             <span style={{ fontSize: '0.75rem', fontWeight: '400', color: 'var(--text-muted)' }}>
@@ -245,48 +242,48 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
               </p>
             ) : (
               filteredPatients.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => handleSelectPatient(p)}
-                    style={{
-                      background: selectedPatient?.id === p.id ? 'rgba(0,100,200,0.08)' : 'rgba(0,100,200,0.02)',
-                      border: selectedPatient?.id === p.id ? '1.5px solid var(--color-primary)' : '1px solid rgba(0,100,200,0.12)',
-                      padding: '14px 16px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}
-                  >
-                    {/* Left: name + tel/age */}
-                    <div>
-                      <div style={{ fontWeight: '700', fontSize: '1rem', color: selectedPatient?.id === p.id ? 'var(--color-primary)' : 'var(--text-primary)' }}>
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        Tel: {p.telephone} | Age: {p.age} yrs
-                      </div>
+                <div
+                  key={p.id}
+                  onClick={() => handleSelectPatient(p)}
+                  style={{
+                    background: selectedPatient?.id === p.id ? 'rgba(0,100,200,0.08)' : 'rgba(0,100,200,0.02)',
+                    border: selectedPatient?.id === p.id ? '1.5px solid var(--color-primary)' : '1px solid rgba(0,100,200,0.12)',
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  {/* Left: name + tel/age */}
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '1rem', color: selectedPatient?.id === p.id ? 'var(--color-primary)' : 'var(--text-primary)' }}>
+                      {p.name}
                     </div>
-                    {/* Right: last visit badge */}
-                    {p.last_visit_date && (
-                      <div style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        gap: '2px', flexShrink: 0,
-                        background: selectedPatient?.id === p.id ? 'rgba(0,100,200,0.12)' : 'rgba(0,100,200,0.06)',
-                        border: '1px solid rgba(0,100,200,0.15)',
-                        borderRadius: '8px', padding: '6px 10px', minWidth: '74px'
-                      }}>
-                        <Calendar size={13} color="var(--color-primary)" />
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Last visit</span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
-                          {new Date(p.last_visit_date).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                      Tel: {p.telephone} | Age: {p.age} yrs
+                    </div>
                   </div>
+                  {/* Right: last visit badge */}
+                  {p.last_visit_date && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '2px', flexShrink: 0,
+                      background: selectedPatient?.id === p.id ? 'rgba(0,100,200,0.12)' : 'rgba(0,100,200,0.06)',
+                      border: '1px solid rgba(0,100,200,0.15)',
+                      borderRadius: '8px', padding: '6px 10px', minWidth: '74px'
+                    }}>
+                      <Calendar size={13} color="var(--color-primary)" />
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Last visit</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+                        {new Date(p.last_visit_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -294,7 +291,7 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
       </div>
 
       {/* RIGHT COLUMN: Patient Medical records profile */}
-      <div style={{ gridColumn: 'span 8' }}>
+      <div className="tab-right-col">
 
 
 
@@ -306,11 +303,11 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500', marginRight: '4px' }}>Filter by visit:</span>
                 {[
-                  { key: 'all',       label: 'All Patients' },
-                  { key: 'today',     label: 'Today' },
+                  { key: 'all', label: 'All Patients' },
+                  { key: 'today', label: 'Today' },
                   { key: 'yesterday', label: 'Yesterday' },
-                  { key: 'last7',     label: 'Last 7 Days' },
-                  { key: 'last30',    label: 'Last 30 Days' },
+                  { key: 'last7', label: 'Last 7 Days' },
+                  { key: 'last30', label: 'Last 30 Days' },
                 ].map(f => (
                   <button
                     key={f.key}
@@ -510,8 +507,8 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
                             background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             opacity: 0, transition: 'opacity 0.2s'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                          onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                           >
                             <span style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Eye size={12} /> View Full
@@ -640,11 +637,11 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '14px', marginBottom: '16px' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500', marginRight: '4px' }}>Filter by visit:</span>
               {[
-                { key: 'all',       label: 'All Patients' },
-                { key: 'today',     label: 'Today' },
+                { key: 'all', label: 'All Patients' },
+                { key: 'today', label: 'Today' },
                 { key: 'yesterday', label: 'Yesterday' },
-                { key: 'last7',     label: 'Last 7 Days' },
-                { key: 'last30',    label: 'Last 30 Days' },
+                { key: 'last7', label: 'Last 7 Days' },
+                { key: 'last30', label: 'Last 30 Days' },
               ].map(f => (
                 <button
                   key={f.key}
@@ -674,6 +671,8 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
           </div>
         )}
       </div>
+
+      </div>{/* end tab-two-col */}
 
     </div>
   );

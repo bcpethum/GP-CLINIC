@@ -122,7 +122,7 @@ export function buildPrescriptionHtml({
 
   // Default Medical Cross Logo SVG if no custom image is uploaded
   const defaultLogoSvg = `
-    <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="110" height="110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="100" height="100" rx="16" fill="#f8fafc"/>
       <path d="M38 20H62V38H80V62H62V80H38V62H20V38H38V20Z" fill="#ef4444"/>
       <circle cx="50" cy="50" r="18" fill="#1e3a8a"/>
@@ -175,12 +175,12 @@ export function buildPrescriptionHtml({
       margin-bottom: 6px;
     }
     .header-logo-cell {
-      width: 42%;
+      width: 35%;
       vertical-align: top;
       text-align: left;
     }
     .header-info-cell {
-      width: 58%;
+      width: 65%;
       vertical-align: top;
       text-align: right;
     }
@@ -189,36 +189,40 @@ export function buildPrescriptionHtml({
       text-align: left;
     }
     .clinic-logo-img {
-      max-width: 140px;
-      max-height: 65px;
+      max-width: 200px;
+      max-height: 120px;
       object-fit: contain;
       display: block;
       margin-bottom: 2px;
     }
     .clinic-name-header {
-      font-size: 18.5px;
+      font-size: 19px;
       font-weight: 800;
       color: #0f172a;
       margin: 0 0 2px 0;
       letter-spacing: -0.2px;
+      white-space: nowrap;
     }
     .clinic-contact-header {
       font-size: 13.5px;
       font-weight: 700;
       color: #334155;
       margin: 0 0 5px 0;
+      white-space: nowrap;
     }
     .doc-name-header {
       font-size: 14.5px;
       font-weight: 700;
       color: #1e293b;
       margin: 0 0 1px 0;
+      white-space: nowrap;
     }
     .doc-meta-header {
       font-size: 13px;
       color: #475569;
       margin: 0 0 1px 0;
       font-weight: 500;
+      white-space: nowrap;
     }
     .ref-divider-row {
       margin-top: 8px;
@@ -554,17 +558,6 @@ export function buildPrescriptionHtml({
           ` : ''}
         </div>
       </div>
-
-      <!-- FOOTER BADGE -->
-      <div class="docwallet-footer-badge">
-        <span style="color: #64748b; font-size: 10px;">Powered by</span>
-        <div class="docwallet-badge-pill">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-          ${config.footerBadgeText || 'GPClinic.lk'}
-        </div>
-      </div>
     </div>
   </div>
 </body>
@@ -577,7 +570,7 @@ export function buildPrescriptionHtml({
  */
 function buildSharedHeaderHtml(config, visitDate, refNo) {
   const defaultLogoSvg = `
-    <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="110" height="110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="100" height="100" rx="16" fill="#f8fafc"/>
       <path d="M38 20H62V38H80V62H62V80H38V62H20V38H38V20Z" fill="#ef4444"/>
       <circle cx="50" cy="50" r="18" fill="#1e3a8a"/>
@@ -650,15 +643,6 @@ function buildSharedFooterHtml(config, visitDate) {
         ` : ''}
       </div>
     </div>
-    <div class="docwallet-footer-badge">
-      <span style="color: #64748b; font-size: 10px;">Powered by</span>
-      <div class="docwallet-badge-pill">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-        </svg>
-        ${config.footerBadgeText || 'GPClinic.lk'}
-      </div>
-    </div>
   `;
 }
 
@@ -671,14 +655,14 @@ function baseDocCss() {
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; line-height: 1.35; padding: 4px 6px; font-size: 14px; }
     .prescription-container { width: 100%; max-width: 680px; margin: 0 auto; page-break-inside: avoid !important; break-inside: avoid !important; }
     .header-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-    .header-logo-cell { width: 42%; vertical-align: top; text-align: left; }
-    .header-info-cell { width: 58%; vertical-align: top; text-align: right; }
+    .header-logo-cell { width: 35%; vertical-align: top; text-align: left; }
+    .header-info-cell { width: 65%; vertical-align: top; text-align: right; }
     .header-info-content { display: inline-block; text-align: left; }
-    .clinic-logo-img { max-width: 140px; max-height: 65px; object-fit: contain; display: block; margin-bottom: 2px; }
-    .clinic-name-header { font-size: 18.5px; font-weight: 800; color: #0f172a; margin: 0 0 2px 0; letter-spacing: -0.2px; }
-    .clinic-contact-header { font-size: 13.5px; font-weight: 700; color: #334155; margin: 0 0 5px 0; }
-    .doc-name-header { font-size: 14.5px; font-weight: 700; color: #1e293b; margin: 0 0 1px 0; }
-    .doc-meta-header { font-size: 13px; color: #475569; margin: 0 0 1px 0; font-weight: 500; }
+    .clinic-logo-img { max-width: 200px; max-height: 120px; object-fit: contain; display: block; margin-bottom: 2px; }
+    .clinic-name-header { font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 2px 0; letter-spacing: -0.2px; white-space: nowrap; }
+    .clinic-contact-header { font-size: 13.5px; font-weight: 700; color: #334155; margin: 0 0 5px 0; white-space: nowrap; }
+    .doc-name-header { font-size: 14.5px; font-weight: 700; color: #1e293b; margin: 0 0 1px 0; white-space: nowrap; }
+    .doc-meta-header { font-size: 13px; color: #475569; margin: 0 0 1px 0; font-weight: 500; white-space: nowrap; }
     .ref-divider-row { margin-top: 8px; margin-bottom: 12px; }
     .ref-no-text { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
     .header-hr { border: none; border-top: 1.5px solid #cbd5e1; margin: 0; }

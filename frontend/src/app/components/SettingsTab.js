@@ -27,9 +27,9 @@ function PermToggle({ label, value, onChange, disabled }) {
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '10px 0',
-      borderBottom: '1px solid rgba(255,255,255,0.05)'
+      borderBottom: '1px solid rgba(0, 100, 200, 0.08)'
     }}>
-      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{label}</span>
+      <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: '500' }}>{label}</span>
       <button
         type="button"
         disabled={disabled}
@@ -107,12 +107,12 @@ function AssistantRow({
   }, [assistant]);
 
   return (
-    <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', background: 'rgba(0, 0, 0, 0.25)' }}>
+    <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', background: '#ffffff', border: '1px solid rgba(0, 100, 200, 0.15)', boxShadow: '0 4px 16px rgba(0, 80, 180, 0.06)' }}>
       {/* Row header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 18px',
-        background: isExpanded ? 'rgba(0,153,255,0.06)' : 'transparent'
+        background: isExpanded ? 'rgba(0, 119, 230, 0.05)' : 'transparent'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
@@ -145,8 +145,8 @@ function AssistantRow({
               </div>
             ) : (
               <>
-                <div style={{ fontWeight: '600', color: '#fff', fontSize: '0.95rem' }}>{assistant.name}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{assistant.email}</div>
+                <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.95rem' }}>{assistant.name}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{assistant.email}</div>
               </>
             )}
           </div>
@@ -178,11 +178,11 @@ function AssistantRow({
 
       {/* Expanded management panel */}
       {isExpanded && (
-        <div style={{ padding: '16px 18px', borderTop: '1px solid var(--glass-border)', animation: 'fadeIn 0.2s ease', background: 'rgba(0,0,0,0.15)' }}>
+        <div style={{ padding: '16px 18px', borderTop: '1px solid rgba(0, 100, 200, 0.12)', animation: 'fadeIn 0.2s ease', background: '#f8fafc' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
             {/* Permissions column */}
             <div>
-              <h4 style={{ fontSize: '0.9rem', color: 'var(--color-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Page Access Permissions
               </h4>
               <PermToggle label="Dashboard" value={localPerms.dashboard} onChange={v => setLocalPerms(p => ({ ...p, dashboard: v }))} />
@@ -202,7 +202,7 @@ function AssistantRow({
 
             {/* Passcode reset column */}
             <div>
-              <h4 style={{ fontSize: '0.9rem', color: 'var(--color-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Reset 4-Digit Passcode
               </h4>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
@@ -385,13 +385,14 @@ function AssistantManagement({ showAlert, showConfirm }) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)',
-        borderRadius: '12px', padding: '14px 18px'
+        background: '#ffffff', border: '1px solid var(--glass-border)',
+        borderRadius: '12px', padding: '14px 18px',
+        boxShadow: '0 4px 16px rgba(0, 80, 180, 0.06)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Shield size={20} style={{ color: 'var(--color-secondary)' }} />
+          <Shield size={20} style={{ color: 'var(--color-primary)' }} />
           <div>
-            <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: 0 }}>Assistant Staff Management</h3>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-primary)', margin: 0, fontWeight: '700' }}>Assistant Staff Management</h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{assistants.length} assistant(s) registered</span>
           </div>
         </div>
@@ -407,8 +408,8 @@ function AssistantManagement({ showAlert, showConfirm }) {
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="glass-panel" style={{ animation: 'fadeIn 0.2s ease', background: 'rgba(0, 0, 0, 0.3)' }}>
-          <h4 style={{ fontSize: '1rem', marginBottom: '16px', color: 'var(--color-secondary)' }}>New Assistant Account</h4>
+        <div className="glass-panel" style={{ animation: 'fadeIn 0.2s ease', background: '#ffffff', border: '1px solid var(--glass-border)', boxShadow: '0 8px 24px rgba(0, 80, 180, 0.08)' }}>
+          <h4 style={{ fontSize: '1rem', marginBottom: '16px', color: 'var(--color-primary)', fontWeight: '700' }}>New Assistant Account</h4>
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
@@ -451,7 +452,7 @@ function AssistantManagement({ showAlert, showConfirm }) {
       {loadingAssistants ? (
         <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>Loading assistants...</div>
       ) : assistants.length === 0 ? (
-        <div className="glass-panel" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+        <div className="glass-panel" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: '#ffffff' }}>
           <UserPlus size={40} style={{ marginBottom: '10px', opacity: 0.4 }} />
           <p>No assistants yet. Click &quot;Create Assistant&quot; to add staff.</p>
         </div>
@@ -615,7 +616,7 @@ function PrescriptionDesignSection({ showAlert }) {
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr',
-          background: 'rgba(0,0,0,0.25)',
+          background: 'rgba(0, 100, 200, 0.06)',
           borderRadius: '8px',
           padding: '3px',
           border: '1px solid var(--glass-border)'
@@ -690,16 +691,17 @@ function PrescriptionDesignSection({ showAlert }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
-                  width: '80px',
-                  height: '60px',
-                  borderRadius: '8px',
+                  width: '120px',
+                  height: '85px',
+                  borderRadius: '10px',
                   background: '#ffffff',
                   border: '1px solid var(--glass-border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
-                  padding: '4px'
+                  padding: '6px',
+                  boxShadow: '0 2px 8px rgba(0, 80, 180, 0.08)'
                 }}>
                   {config.clinicLogo ? (
                     <img src={config.clinicLogo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
@@ -1009,14 +1011,14 @@ function PrescriptionDesignSection({ showAlert }) {
             {/* Top Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
               {/* Logo */}
-              <div style={{ width: '42%' }}>
+              <div style={{ width: '35%' }}>
                 {config.showClinicLogo && (
                   <div>
                     {config.clinicLogo ? (
-                      <img src={config.clinicLogo} alt="Logo" style={{ maxHeight: '60px', maxWidth: '130px', objectFit: 'contain' }} />
+                      <img src={config.clinicLogo} alt="Logo" style={{ maxHeight: '110px', maxWidth: '180px', objectFit: 'contain' }} />
                     ) : (
-                      <div style={{ width: '48px', height: '48px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '22px' }}>+</span>
+                      <div style={{ width: '85px', height: '85px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '38px' }}>+</span>
                       </div>
                     )}
                   </div>
@@ -1024,13 +1026,13 @@ function PrescriptionDesignSection({ showAlert }) {
               </div>
 
               {/* Clinic details */}
-              <div style={{ textAlign: 'right', width: '58%' }}>
+              <div style={{ textAlign: 'right', width: '65%' }}>
                 <div style={{ display: 'inline-block', textAlign: 'left' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', lineHeight: '1.2' }}>{config.clinicName || 'Suwa Sahana Medical Centre'}</div>
-                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#334155', margin: '2px 0 5px' }}>T.P - {config.clinicPhone || '0772582613'}</div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>{config.doctorName || 'Dr. B.S. Pathum'}</div>
-                  <div style={{ fontSize: '11.5px', color: '#475569' }}>{config.doctorQualifications || 'MBBS (Peradeniya)'}</div>
-                  <div style={{ fontSize: '11.5px', color: '#475569' }}>{config.doctorRegNo || 'SLMC Reg no - 39737'}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', lineHeight: '1.2', whiteSpace: 'nowrap' }}>{config.clinicName || 'Suwa Sahana Medical Centre'}</div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#334155', margin: '2px 0 5px', whiteSpace: 'nowrap' }}>T.P - {config.clinicPhone || '0772582613'}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b', whiteSpace: 'nowrap' }}>{config.doctorName || 'Dr. B.S. Pathum'}</div>
+                  <div style={{ fontSize: '11.5px', color: '#475569', whiteSpace: 'nowrap' }}>{config.doctorQualifications || 'MBBS (Peradeniya)'}</div>
+                  <div style={{ fontSize: '11.5px', color: '#475569', whiteSpace: 'nowrap' }}>{config.doctorRegNo || 'SLMC Reg no - 39737'}</div>
                 </div>
               </div>
             </div>
@@ -1146,12 +1148,6 @@ function PrescriptionDesignSection({ showAlert }) {
               </div>
 
             </div>
-
-            {/* GPClinic Badge Footer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '18px', fontSize: '9.5px', color: '#0284c7' }}>
-              <span style={{ color: '#94a3b8' }}>Powered by</span>
-              <strong>{config.footerBadgeText || 'GPClinic.lk'}</strong>
-            </div>
           </div>
         </div>
       </div>
@@ -1175,7 +1171,7 @@ export default function SettingsTab({ API_BASE, showAlert, showConfirm, user }) 
   };
 
   return (
-    <div className="fade-in" style={{ padding: '12px 4px', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-scroll-wrapper fade-in" style={{ maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Settings Navigation Header */}
       <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -1199,7 +1195,7 @@ export default function SettingsTab({ API_BASE, showAlert, showConfirm, user }) 
         {/* Section Switcher */}
         <div style={{
           display: 'flex',
-          background: 'rgba(0,0,0,0.25)',
+          background: 'rgba(0, 100, 200, 0.06)',
           borderRadius: '10px',
           padding: '4px',
           border: '1px solid var(--glass-border)',

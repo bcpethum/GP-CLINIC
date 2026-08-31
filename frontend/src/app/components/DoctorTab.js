@@ -595,17 +595,11 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
 
   return (
     <>
-      <div className="grid-container fade-in" style={{
-        gridTemplateColumns: 'repeat(12, 1fr)',
-        padding: '12px 4px',
-        maxWidth: '1400px',
-        margin: '0 auto',
-        gap: '20px'
-      }}>
+      <div className="doctor-panel-wrapper fade-in">
 
-        {/* Top Banner Stats Widget */}
+        {/* Top Banner Stats Widget – stays pinned, never scrolls */}
         <div style={{
-          gridColumn: 'span 12',
+          flexShrink: 0,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -649,8 +643,11 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           </div>
         </div>
 
-        {/* LEFT COLUMN: Patient Selection, Search, Age inputs, QR blocks, drop downs */}
-        <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Two-column content area: left + right independently scrollable */}
+        <main className="doctor-content">
+
+          {/* LEFT COLUMN: Patient / Demographics / Clinical scroll container */}
+          <section className="left-scroll-container">
 
           {/* Dropdowns Block */}
           <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '14px' }}>
@@ -1212,12 +1209,11 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               )}
             </div>
           </div>
+          </section>
 
-        </div>
-
-        {/* RIGHT COLUMN: Prescription Builder & Dispenser */}
-        <div style={{ gridColumn: 'span 7' }}>
-          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', minHeight: '600px' }}>
+          {/* RIGHT COLUMN: Prescription Builder & Dispenser scroll container */}
+          <section className="right-scroll-container">
+            <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0 }}>
 
 
             {/* Search Inventory & Autofill Row */}
@@ -1454,8 +1450,10 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               </div>
             </div>
 
-          </div>
-        </div>
+            </div>
+          </section>
+
+        </main>
 
       </div>
 

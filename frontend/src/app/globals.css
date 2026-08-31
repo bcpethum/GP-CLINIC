@@ -35,8 +35,8 @@
 body {
   background: radial-gradient(circle at 10% 20%, rgb(220, 235, 255) 0%, rgb(240, 246, 255) 90%);
   color: var(--text-primary);
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
   position: relative;
   font-size: 17px;
 }
@@ -362,5 +362,158 @@ input:checked+.slider:before {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ── Doctor Panel: full-viewport no-scroll layout ── */
+
+/* The root app shell: full height, flex column */
+.app-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The <main> tag that hosts tab content */
+.app-main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Outer wrapper rendered by DoctorTab */
+.doctor-panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 12px 4px;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* The two-column content area below the Doctor Panel summary banner */
+.doctor-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* LEFT column scroll container */
+.left-scroll-container {
+  flex: 0 0 38%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  padding-bottom: 16px;
+}
+
+/* RIGHT column scroll container */
+.right-scroll-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+/* Responsive: stack columns on tablet / mobile */
+@media (max-width: 900px) {
+  .doctor-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .left-scroll-container,
+  .right-scroll-container {
+    flex: 0 0 auto;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 0;
+  }
+}
+
+/* ── Generic full-height tab wrapper (Patients, Drugs, SMS, Dashboard) ── */
+
+/* Full-height two-column layout (mirrors doctor-panel-wrapper + doctor-content) */
+.tab-panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 4px;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 20px;
+}
+
+/* Two-column row that fills remaining vertical space */
+.tab-two-col {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* Left panel — fixed width, internal scroll */
+.tab-left-col {
+  flex: 0 0 33%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  padding-bottom: 16px;
+}
+
+/* Right panel — fills remaining space, internal scroll */
+.tab-right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+/* Single-column full-height scroll wrapper (Drugs, Dashboard, SMS) */
+.tab-scroll-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 4px 16px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .tab-two-col {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .tab-left-col,
+  .tab-right-col {
+    flex: 0 0 auto;
+    overflow-y: visible;
+    padding-right: 0;
   }
 }

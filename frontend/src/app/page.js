@@ -154,10 +154,10 @@ function AppContent() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-shell">
       <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <main style={{ flex: 1, paddingBottom: '40px' }}>
+      <main className="app-main">
         {activeTab ? renderTabContent() : null}
       </main>
 

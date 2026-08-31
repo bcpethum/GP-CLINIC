@@ -131,7 +131,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
   });
 
   return (
-    <div className="fade-in" style={{ padding: '12px 4px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="tab-scroll-wrapper fade-in">
       
       {/* Top Controls Toolbar */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>

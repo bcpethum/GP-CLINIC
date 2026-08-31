@@ -88,7 +88,7 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
   };
 
   return (
-    <div className="fade-in" style={{ padding: '12px 4px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-scroll-wrapper fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Date Filter Panel */}
       <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
