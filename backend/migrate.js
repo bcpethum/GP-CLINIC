@@ -2,16 +2,10 @@ const db = require('./db');
 const fs = require('fs');
 const path = require('path');
 
-// full_schema.sql runs first and creates all tables correctly (IF NOT EXISTS).
-// Subsequent migration files patch older databases.
-const MIGRATION_FILES = [
-  { file: '../full_schema.sql', dir: __dirname },          // canonical schema
-  { file: 'migrations/001_add_auth.sql', dir: __dirname },
-  { file: 'migrations/002_add_settings.sql', dir: __dirname },
-  { file: 'migrations/002_doctor_data_isolation.sql', dir: __dirname },
-  { file: 'migrations/add_shared_documents.sql', dir: __dirname },
-  { file: 'migrations/003_ensure_schema.sql', dir: __dirname },
-];
+// Single source-of-truth schema.
+// All tables, columns, indexes, and patches are in schema.sql.
+// No separate migration files needed.
+const SCHEMA_FILE = path.join(__dirname, 'schema.sql');
 
 // Split a SQL file into individual statements, correctly handling DO $$ blocks
 function splitSqlStatements(sql) {
@@ -40,37 +34,37 @@ function splitSqlStatements(sql) {
 }
 
 async function runMigrations() {
-  console.log('🔄 Checking and applying database migrations...');
+  console.log('🔄 Applying database schema...');
 
-  for (const { file, dir } of MIGRATION_FILES) {
-    const filePath = path.join(dir, file);
-    if (!fs.existsSync(filePath)) continue;
-
-    const label = path.basename(file);
-    console.log(`📄 Running: ${label}`);
-    const sql = fs.readFileSync(filePath, 'utf8');
-    const statements = splitSqlStatements(sql);
-    let ok = 0, warn = 0;
-
-    for (const stmt of statements) {
-      try {
-        await db.query(stmt);
-        ok++;
-      } catch (err) {
-        const expected =
-          err.code === '42701' || // duplicate_column
-          err.code === '42P07' || // duplicate_table
-          err.code === '42710' || // duplicate_object
-          err.message.includes('already exists');
-        if (!expected) {
-          console.warn(`  ⚠️  [${label}] ${err.message.split('\n')[0]}`);
-          warn++;
-        }
-      }
-    }
-    console.log(`  ✅ ${label}: ${ok} ok${warn ? `, ${warn} warnings` : ''}`);
+  if (!fs.existsSync(SCHEMA_FILE)) {
+    console.error('❌ schema.sql not found at', SCHEMA_FILE);
+    return;
   }
 
+  const sql = fs.readFileSync(SCHEMA_FILE, 'utf8');
+  const statements = splitSqlStatements(sql);
+  let ok = 0, warn = 0;
+
+  for (const stmt of statements) {
+    try {
+      await db.query(stmt);
+      ok++;
+    } catch (err) {
+      const expected =
+        err.code === '42701' || // duplicate_column
+        err.code === '42P07' || // duplicate_table
+        err.code === '42710' || // duplicate_object
+        err.message.includes('already exists') ||
+        err.message.includes('does not exist');  // DROP NOT NULL on already-nullable column
+
+      if (!expected) {
+        console.warn(`  ⚠️  ${err.message.split('\n')[0]}`);
+        warn++;
+      }
+    }
+  }
+
+  console.log(`  ✅ schema.sql: ${ok} ok${warn ? `, ${warn} warnings` : ''}`);
   console.log('✅ Database setup complete.');
 }
 
