@@ -15,15 +15,32 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const searchDebounceRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const searchInputRef = useRef(null);
 
-  // Close suggestions on outside click
+  // Calculate dropdown position from input element
+  const updateDropdownPos = () => {
+    if (searchInputRef.current) {
+      const rect = searchInputRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  };
+
+  // Close suggestions on outside click; also update position on scroll/resize
   useEffect(() => {
     const handler = (e) => { if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setShowSuggestions(false); };
+    const reposition = () => { if (showSuggestions) updateDropdownPos(); };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [showSuggestions]);
 
   // Debounced live search
   const handleSearchInput = useCallback((val) => {
@@ -34,7 +51,8 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
       try {
         const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
         setSearchResults(data);
-        setShowSuggestions(data.length > 0);
+        if (data.length > 0) { updateDropdownPos(); setShowSuggestions(true); }
+        else setShowSuggestions(false);
       } catch { setSearchResults([]); }
     }, 300);
   }, []);
@@ -278,45 +296,18 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
               <div style={{ display: 'flex', gap: '8px' }} ref={searchBoxRef}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
+                    ref={searchInputRef}
                     type="text"
                     className="input-glass"
                     placeholder="Search by Tel No or Name"
                     value={searchQuery}
                     onChange={e => handleSearchInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); handleSearch(); } if (e.key === 'Escape') setShowSuggestions(false); }}
-                    onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
+                    onFocus={() => { if (searchResults.length > 0) { updateDropdownPos(); setShowSuggestions(true); } }}
                     style={{ paddingRight: '36px' }}
                     autoComplete="off"
                   />
                   <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-
-                  {/* Live autocomplete dropdown */}
-                  {showSuggestions && searchResults.length > 0 && (
-                    <ul style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0,
-                      background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
-                      listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
-                      maxHeight: '220px', overflowY: 'auto'
-                    }}>
-                      {searchResults.slice(0, 6).map(p => (
-                        <li
-                          key={p.id}
-                          onMouseDown={() => selectPatient(p)}
-                          style={{
-                            padding: '9px 14px', cursor: 'pointer', display: 'flex',
-                            flexDirection: 'column', gap: '2px',
-                            borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
-                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowSuggestions(false); handleSearch(); }} disabled={loadingSearch} style={{ padding: '10px 14px' }}>
                   {loadingSearch ? '...' : <Search size={16} />}
@@ -648,6 +639,42 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
             </div>
           </div>
         </div>
+      )}
+      {/* Fixed-position autocomplete dropdown — renders above ALL containers */}
+      {showSuggestions && searchResults.length > 0 && (
+        <ul style={{
+          position: 'fixed',
+          top: dropdownPos.top,
+          left: dropdownPos.left,
+          width: dropdownPos.width,
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
+          zIndex: 999999,
+          listStyle: 'none',
+          margin: 0,
+          padding: '4px 0',
+          maxHeight: '260px',
+          overflowY: 'auto'
+        }}>
+          {searchResults.slice(0, 8).map(p => (
+            <li
+              key={p.id}
+              onMouseDown={() => selectPatient(p)}
+              style={{
+                padding: '10px 16px', cursor: 'pointer', display: 'flex',
+                flexDirection: 'column', gap: '3px',
+                borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>{p.name}</span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}{p.age ? ` | ${p.age} yrs` : ''}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </>
   );
