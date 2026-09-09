@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, ChevronDown, ChevronUp, Plus, Trash2, Printer, Check, RefreshCw, QrCode, Camera, Calendar, FileText, ExternalLink, Copy, X, ArrowRight } from 'lucide-react';
 import QrCanvas from './QrCanvas';
 import PrintDocumentModal from './PrintDocumentModal';
@@ -129,6 +129,16 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   // Demographics Search & Edit States
   const [searchTel, setSearchTel] = useState('');
   const [searchName, setSearchName] = useState('');
+
+  // Autocomplete suggestion states
+  const [telSuggestions, setTelSuggestions] = useState([]);
+  const [nameSuggestions, setNameSuggestions] = useState([]);
+  const [showTelSuggestions, setShowTelSuggestions] = useState(false);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const telSuggestRef = useRef(null);
+  const nameSuggestRef = useRef(null);
+  const telDebounceRef = useRef(null);
+  const nameDebounceRef = useRef(null);
   const [ageY, setAgeY] = useState('');
   const [ageM, setAgeM] = useState('0');
   const [weight, setWeight] = useState('');
@@ -314,9 +324,53 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     }
   };
 
+  // Close suggestion dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (telSuggestRef.current && !telSuggestRef.current.contains(e.target)) setShowTelSuggestions(false);
+      if (nameSuggestRef.current && !nameSuggestRef.current.contains(e.target)) setShowNameSuggestions(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced fetch for tel suggestions
+  const fetchTelSuggestions = useCallback((val) => {
+    clearTimeout(telDebounceRef.current);
+    if (!val.trim()) { setTelSuggestions([]); setShowTelSuggestions(false); return; }
+    telDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
+        setTelSuggestions(data.slice(0, 6));
+        setShowTelSuggestions(data.length > 0);
+      } catch { setTelSuggestions([]); }
+    }, 300);
+  }, []);
+
+  // Debounced fetch for name suggestions
+  const fetchNameSuggestions = useCallback((val) => {
+    clearTimeout(nameDebounceRef.current);
+    if (!val.trim()) { setNameSuggestions([]); setShowNameSuggestions(false); return; }
+    nameDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
+        setNameSuggestions(data.slice(0, 6));
+        setShowNameSuggestions(data.length > 0);
+      } catch { setNameSuggestions([]); }
+    }, 300);
+  }, []);
+
+  // Select a suggestion from either dropdown
+  const selectSuggestion = (patient) => {
+    loadPatientIntoForm(patient);
+    setTelSuggestions([]); setShowTelSuggestions(false);
+    setNameSuggestions([]); setShowNameSuggestions(false);
+  };
+
   // Magnifying Search by Tel No
   const handleSearchByTel = async () => {
     if (!searchTel.trim()) return;
+    setShowTelSuggestions(false);
     try {
       const data = await apiFetch(`/patients?search=${encodeURIComponent(searchTel)}`);
       if (data.length > 0) {
@@ -335,6 +389,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   // Magnifying Search by Name
   const handleSearchByName = async () => {
     if (!searchName.trim()) return;
+    setShowNameSuggestions(false);
     try {
       const data = await apiFetch(`/patients?search=${encodeURIComponent(searchName)}`);
       if (data.length > 0) {
@@ -649,566 +704,624 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           {/* LEFT COLUMN: Patient / Demographics / Clinical scroll container */}
           <section className="left-scroll-container">
 
-          {/* Dropdowns Block */}
-          <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '14px' }}>
-            <div>
-              <label className="label-glass" style={{ fontSize: '0.85rem' }}>Select from queue</label>
-              <select
-                className="input-glass"
-                value={activeVisit?.id ? activeVisit.id.toString() : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    handleClearForm();
-                    return;
-                  }
-                  const visit = queue.find(q => Number(q.id) === Number(val));
-                  if (visit) handleSelectActiveVisit(visit);
-                }}
-                style={{ fontSize: '0.95rem', padding: '9px 10px' }}
-              >
-                <option value="">-</option>
-                {queue.map(q => (
-                  <option key={q.id} value={q.id.toString()}>Q#{q.queue_number} - {q.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-glass" style={{ fontSize: '0.85rem' }}>Previous visits</label>
-              <select
-                className="input-glass"
-                value={historyVisitId ? historyVisitId.toString() : ''}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  setHistoryVisitId(val);
-                  if (!val) return;
-                  const visit = history.find(h => Number(h.id) === Number(val));
-                  if (visit) {
-                    setDiagnosis(visit.diagnosis || '');
-                    setNextVisitPlan(visit.next_visit_plan || '');
-                    if (visit.prescriptions) {
-                      setPrescribedDrugs(visit.prescriptions.map(p => ({
-                        medicine_name: p.medicine_name,
-                        dosage: p.dosage,
-                        duration_days: p.duration_days,
-                        price: parseFloat(p.price)
-                      })));
-                    }
-                    await showAlert(`Loaded details of visit from ${new Date(visit.visit_date).toLocaleDateString()}`, 'History Loaded');
-                  }
-                }}
-                style={{ fontSize: '0.95rem', padding: '9px 10px' }}
-                disabled={history.length === 0}
-              >
-                <option value="">-</option>
-                {history.map(h => (
-                  <option key={h.id} value={h.id.toString()}>{new Date(h.visit_date).toLocaleDateString()} - {h.diagnosis || 'Checkup'}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Demographics, Search & QR panel (Image 2 exact match) */}
-          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1.8fr', gap: '14px' }}>
-              {/* Left Inputs block */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Tel No</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="Search phone..."
-                      value={searchTel}
-                      onChange={(e) => setSearchTel(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearchByTel()}
-                      style={{ fontSize: '1rem', padding: '10px 12px' }}
-                    />
-                    <button className="btn btn-secondary" style={{ padding: '8px 12px' }} onClick={handleSearchByTel}>
-                      <Search size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Name</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="Search name..."
-                      value={searchName}
-                      onChange={(e) => setSearchName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearchByName()}
-                      style={{ fontSize: '1rem', padding: '10px 12px' }}
-                    />
-                    <button className="btn btn-secondary" style={{ padding: '8px 12px' }} onClick={handleSearchByName}>
-                      <Search size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Age & Vitals block */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 44px', gap: '8px' }}>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>Y</label>
-                    <input
-                      type="number"
-                      className="input-glass"
-                      placeholder="Years"
-                      value={ageY}
-                      onChange={(e) => setAgeY(e.target.value)}
-                      style={{ textAlign: 'center', padding: '10px 8px', fontSize: '1rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>M</label>
-                    <input
-                      type="number"
-                      className="input-glass"
-                      placeholder="Months"
-                      value={ageM}
-                      onChange={(e) => setAgeM(e.target.value)}
-                      style={{ textAlign: 'center', padding: '10px 8px', fontSize: '1rem' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ padding: '8px', width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      onClick={() => {
-                        if (selectedPatient) showAlert(`Loading complete digital card for Patient ID: ${selectedPatient.id}`, 'Digital Patient Card');
-                        else showAlert('Please search or load a patient first.', 'No Patient Loaded');
-                      }}
-                    >
-                      <FileText size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right QR block */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                {/* QR display square */}
-                <div style={{
-                  width: '148px',
-                  height: '148px',
-                  border: '1px solid #e2e8f0',
-                  background: '#ffffff',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  boxShadow: '0 1px 6px rgba(0,0,0,0.08)'
-                }}>
-                  <QrCanvas text={qrCodeData} size={140} />
-                </div>
-
-                <button
-                  className="btn btn-primary"
-                  style={{ width: '148px', padding: '6px', fontSize: '0.85rem', fontWeight: 'bold' }}
-                  onClick={handleGenerateQrCode}
-                >
-                  Generate
-                </button>
-
-                <div style={{ display: 'flex', gap: '4px', width: '148px' }}>
-                  <button className="btn btn-secondary" style={{ flex: 1, padding: '6px' }} onClick={handleScanQrMock}>
-                    <QrCode size={15} />
-                  </button>
-                  <button className="btn btn-secondary" style={{ flex: 1, padding: '6px' }} onClick={async () => await showAlert('Launching camera view interface for live QR code scanning...', 'Live Scanner')}>
-                    <Camera size={15} />
-                  </button>
-                </div>
-
-                <button
-                  className="btn btn-warning"
-                  style={{ width: '148px', padding: '6px', fontSize: '0.85rem' }}
-                  onClick={handleClearForm}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {/* Vitals row (editable weight/height) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+            {/* Dropdowns Block */}
+            <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '14px' }}>
               <div>
-                <label className="label-glass" style={{ fontSize: '0.85rem' }}>Weight (kg)</label>
-                <input type="number" className="input-glass" placeholder="Wt" value={weight} onChange={(e) => setWeight(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
-              </div>
-              <div>
-                <label className="label-glass" style={{ fontSize: '0.85rem' }}>Height (cm)</label>
-                <input type="number" className="input-glass" placeholder="Ht" value={height} onChange={(e) => setHeight(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
-              </div>
-            </div>
-
-            {/* Date Picker & Visit priority / Category */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px', marginTop: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={16} style={{ opacity: 0.5, flexShrink: 0 }} />
-                <input
-                  type="date"
-                  className="input-glass"
-                  value={visitDateText}
-                  onChange={(e) => setVisitDateText(e.target.value)}
-                  style={{ fontSize: '0.95rem', padding: '9px 8px' }}
-                />
-              </div>
-              <div>
+                <label className="label-glass" style={{ fontSize: '0.85rem' }}>Select from queue</label>
                 <select
                   className="input-glass"
-                  value={visitPriority}
-                  onChange={(e) => setVisitPriority(e.target.value)}
-                  style={{ fontSize: '0.95rem', padding: '9px 10px', width: '100%' }}
+                  value={activeVisit?.id ? activeVisit.id.toString() : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      handleClearForm();
+                      return;
+                    }
+                    const visit = queue.find(q => Number(q.id) === Number(val));
+                    if (visit) handleSelectActiveVisit(visit);
+                  }}
+                  style={{ fontSize: '0.95rem', padding: '9px 10px' }}
                 >
-                  {VISIT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  <option value="">-</option>
+                  {queue.map(q => (
+                    <option key={q.id} value={q.id.toString()}>Q#{q.queue_number} - {q.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label-glass" style={{ fontSize: '0.85rem' }}>Previous visits</label>
+                <select
+                  className="input-glass"
+                  value={historyVisitId ? historyVisitId.toString() : ''}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setHistoryVisitId(val);
+                    if (!val) return;
+                    const visit = history.find(h => Number(h.id) === Number(val));
+                    if (visit) {
+                      setDiagnosis(visit.diagnosis || '');
+                      setNextVisitPlan(visit.next_visit_plan || '');
+                      if (visit.prescriptions) {
+                        setPrescribedDrugs(visit.prescriptions.map(p => ({
+                          medicine_name: p.medicine_name,
+                          dosage: p.dosage,
+                          duration_days: p.duration_days,
+                          price: parseFloat(p.price)
+                        })));
+                      }
+                      await showAlert(`Loaded details of visit from ${new Date(visit.visit_date).toLocaleDateString()}`, 'History Loaded');
+                    }
+                  }}
+                  style={{ fontSize: '0.95rem', padding: '9px 10px' }}
+                  disabled={history.length === 0}
+                >
+                  <option value="">-</option>
+                  {history.map(h => (
+                    <option key={h.id} value={h.id.toString()}>{new Date(h.visit_date).toLocaleDateString()} - {h.diagnosis || 'Checkup'}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-          </div>
+            {/* Demographics, Search & QR panel (Image 2 exact match) */}
+            <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          {/* Pink Allergies Warning block */}
-          {allergiesText && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: 'var(--color-danger)',
-              fontSize: '0.85rem',
-              padding: '12px',
-              borderRadius: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px'
-            }}>
-              <strong style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>Allergies Alert Warning:</strong>
-              <span>{allergiesText}</span>
-            </div>
-          )}
-
-          {/* Diagnosis Dropdown */}
-          <div className="glass-panel" style={{ padding: '14px 20px' }}>
-            <div
-              onClick={() => setShowDiagnosisDropdown(!showDiagnosisDropdown)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-            >
-              <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Diagnosis & Current Illness</span>
-              {showDiagnosisDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </div>
-
-            {showDiagnosisDropdown && (
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <textarea
-                  className="input-glass"
-                  rows={3}
-                  placeholder="Enter diagnosis, illness description, clinical notes..."
-                  value={diagnosis}
-                  onChange={(e) => setDiagnosis(e.target.value)}
-                  style={{ resize: 'none', fontSize: '1rem', padding: '10px 12px' }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Last Visit Details Dropdown - Enhanced */}
-          <div className="glass-panel" style={{ padding: '14px 20px' }}>
-            <div
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
-              <div
-                onClick={() => setShowLastVisitDropdown(!showLastVisitDropdown)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}
-              >
-                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Last Visit Details &amp; History</span>
-                {history.length > 0 && (
-                  <span style={{
-                    fontSize: '0.7rem', background: 'var(--accent-blue-bg)', color: 'var(--color-secondary)',
-                    padding: '2px 8px', borderRadius: '10px', fontWeight: '600'
-                  }}>{history.length} visit{history.length !== 1 ? 's' : ''}</span>
-                )}
-                {showLastVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </div>
-              {/* All Visits button */}
-              <button
-                onClick={() => setShowAllVisitsModal(true)}
-                disabled={history.length === 0}
-                style={{
-                  background: 'none', border: '1px solid var(--glass-border)', borderRadius: '6px',
-                  padding: '4px 10px', cursor: history.length === 0 ? 'not-allowed' : 'pointer',
-                  color: history.length === 0 ? 'var(--text-muted)' : 'var(--color-secondary)',
-                  fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px',
-                  opacity: history.length === 0 ? 0.5 : 1, transition: 'all 0.2s'
-                }}
-                title="View all visits"
-              >
-                <ExternalLink size={13} /> All Visits
-              </button>
-            </div>
-
-            {showLastVisitDropdown && (
-              <div style={{ marginTop: '12px', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '2px' }}>
-                {history.length === 0 ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', textAlign: 'center' }}>No previous visit records found.</div>
-                ) : (
-                  history.map((h, i) => {
-                    const isExpanded = expandedVisitId === h.id;
-                    const visitDate = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                    const hasMeds = h.prescriptions && h.prescriptions.length > 0;
-                    return (
-                      <div key={h.id} style={{
-                        background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.15)',
-                        border: i === 0 ? '1px solid rgba(0,153,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
-                        borderRadius: '10px', fontSize: '0.85rem', overflow: 'hidden'
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1.8fr', gap: '14px' }}>
+                {/* Left Inputs block */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Tel No with autocomplete */}
+                  <div ref={telSuggestRef} style={{ position: 'relative' }}>
+                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>Tel No</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="Search phone..."
+                        value={searchTel}
+                        onChange={(e) => { setSearchTel(e.target.value); fetchTelSuggestions(e.target.value); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearchByTel(); if (e.key === 'Escape') setShowTelSuggestions(false); }}
+                        onFocus={() => telSuggestions.length > 0 && setShowTelSuggestions(true)}
+                        style={{ fontSize: '1rem', padding: '10px 12px' }}
+                        autoComplete="off"
+                      />
+                      <button className="btn btn-secondary" style={{ padding: '8px 12px' }} onClick={handleSearchByTel}>
+                        <Search size={16} />
+                      </button>
+                    </div>
+                    {showTelSuggestions && telSuggestions.length > 0 && (
+                      <ul style={{
+                        position: 'absolute', top: '100%', left: 0, right: '46px',
+                        background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+                        listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
+                        maxHeight: '220px', overflowY: 'auto'
                       }}>
-                        {/* Visit card header */}
-                        <div style={{ padding: '10px 12px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{
-                                width: '8px', height: '8px', borderRadius: '50%',
-                                background: i === 0 ? '#10b981' : '#64748b', display: 'inline-block', flexShrink: 0
-                              }} />
-                              <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{visitDate}</strong>
-                              {i === 0 && (
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '1px 6px', borderRadius: '6px', fontWeight: '700' }}>LAST VISIT</span>
-                              )}
-                            </div>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
-                          </div>
+                        {telSuggestions.map(p => (
+                          <li
+                            key={p.id}
+                            onMouseDown={() => selectSuggestion(p)}
+                            style={{
+                              padding: '9px 14px', cursor: 'pointer', display: 'flex',
+                              flexDirection: 'column', gap: '2px',
+                              borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
 
-                          <div style={{ marginBottom: '8px' }}>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                              <strong style={{ color: 'var(--text-primary)' }}>Diagnosis:</strong> {h.diagnosis || 'General Checkup'}
-                            </span>
-                          </div>
+                  {/* Name with autocomplete */}
+                  <div ref={nameSuggestRef} style={{ position: 'relative' }}>
+                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>Name</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="Search name..."
+                        value={searchName}
+                        onChange={(e) => { setSearchName(e.target.value); fetchNameSuggestions(e.target.value); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearchByName(); if (e.key === 'Escape') setShowNameSuggestions(false); }}
+                        onFocus={() => nameSuggestions.length > 0 && setShowNameSuggestions(true)}
+                        style={{ fontSize: '1rem', padding: '10px 12px' }}
+                        autoComplete="off"
+                      />
+                      <button className="btn btn-secondary" style={{ padding: '8px 12px' }} onClick={handleSearchByName}>
+                        <Search size={16} />
+                      </button>
+                    </div>
+                    {showNameSuggestions && nameSuggestions.length > 0 && (
+                      <ul style={{
+                        position: 'absolute', top: '100%', left: 0, right: '46px',
+                        background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+                        listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
+                        maxHeight: '220px', overflowY: 'auto'
+                      }}>
+                        {nameSuggestions.map(p => (
+                          <li
+                            key={p.id}
+                            onMouseDown={() => selectSuggestion(p)}
+                            style={{
+                              padding: '9px 14px', cursor: 'pointer', display: 'flex',
+                              flexDirection: 'column', gap: '2px',
+                              borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
 
-                          {/* Expandable prescription table */}
-                          {hasMeds && (
-                            <div>
-                              <button
-                                onClick={() => setExpandedVisitId(isExpanded ? null : h.id)}
-                                style={{
-                                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                                  borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
-                                  color: 'var(--text-secondary)', fontSize: '0.75rem',
-                                  display: 'flex', alignItems: 'center', gap: '4px', marginBottom: isExpanded ? '8px' : '0'
-                                }}
-                              >
-                                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                {h.prescriptions.length} Medicine(s)
-                              </button>
-
-                              {isExpanded && (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '4px' }}>
-                                  <thead>
-                                    <tr style={{ background: 'rgba(0,153,255,0.08)', borderBottom: '1px solid rgba(0,153,255,0.15)' }}>
-                                      <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Drug</th>
-                                      <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Dosage</th>
-                                      <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Durat..</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {h.prescriptions.map((rx, idx) => (
-                                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: '500' }}>{rx.medicine_name}</td>
-                                        <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--color-secondary)' }}>{rx.dosage}</td>
-                                        <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{rx.duration_days}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Action buttons */}
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                            <button
-                              onClick={() => handlePrintHistoryVisit(h)}
-                              style={{
-                                flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                                borderRadius: '6px', padding: '6px 8px', cursor: 'pointer',
-                                color: 'var(--text-secondary)', fontSize: '0.75rem',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
-                              title="Print this prescription"
-                            >
-                              <Printer size={12} /> Print
-                            </button>
-                            <button
-                              onClick={() => handleRepeatPrescription(h)}
-                              disabled={!hasMeds}
-                              style={{
-                                flex: 2, background: hasMeds ? 'rgba(0,153,255,0.12)' : 'rgba(0,0,0,0.1)',
-                                border: `1px solid ${hasMeds ? 'rgba(0,153,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                                borderRadius: '6px', padding: '6px 10px', cursor: hasMeds ? 'pointer' : 'not-allowed',
-                                color: hasMeds ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.75rem',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                                opacity: hasMeds ? 1 : 0.5, transition: 'all 0.2s'
-                              }}
-                              title="Use this prescription for current visit"
-                            >
-                              <Copy size={12} /> Use this Prescription
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Laboratory Investigations Panel */}
-          <div className="glass-panel" style={{ padding: '14px 20px' }}>
-            <div
-              onClick={() => setShowLabsDropdown(!showLabsDropdown)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-            >
-              <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Lab Investigations Log</span>
-              {showLabsDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </div>
-
-            {showLabsDropdown && (
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Input current values or review previous entries below.</p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Full Blood Count (FBC)</label>
-                    <input type="text" className="input-glass" placeholder="WBC, RBC, Hb" value={fbc} onChange={(e) => setFbc(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Fasting Blood Sugar (FBS)</label>
-                    <input type="text" className="input-glass" placeholder="mg/dl" value={fbs} onChange={(e) => setFbs(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Lipid Profile</label>
-                    <input type="text" className="input-glass" placeholder="Chol, HDL, LDL" value={lipidProfile} onChange={(e) => setLipidProfile(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Urine Full Report (UFR)</label>
-                    <input type="text" className="input-glass" placeholder="Album, Sugar, Pus" value={ufr} onChange={(e) => setUfr(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>C-Reactive Protein (C-RP)</label>
-                    <input type="text" className="input-glass" placeholder="mg/L" value={crp} onChange={(e) => setCrp(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>ESR</label>
-                    <input type="text" className="input-glass" placeholder="mm/hr" value={esr} onChange={(e) => setEsr(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Dengue NS-1 Ag</label>
-                    <input type="text" className="input-glass" placeholder="Neg/Pos" value={dengueNs1} onChange={(e) => setDengueNs1(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Influenza Ag</label>
-                    <input type="text" className="input-glass" placeholder="Neg/Pos" value={influenzaAg} onChange={(e) => setInfluenzaAg(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Liver Function (LFT)</label>
-                    <input type="text" className="input-glass" placeholder="SGPT, SGOT" value={lft} onChange={(e) => setLft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Thyroid Function (TFT)</label>
-                    <input type="text" className="input-glass" placeholder="TSH, T3, T4" value={tft} onChange={(e) => setTft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label className="label-glass" style={{ fontSize: '0.7rem' }}>Renal Function (RFT)</label>
-                    <input type="text" className="input-glass" placeholder="Urea, Creatinine" value={rft} onChange={(e) => setRft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                  {/* Age & Vitals block */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 44px', gap: '8px' }}>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.9rem' }}>Y</label>
+                      <input
+                        type="number"
+                        className="input-glass"
+                        placeholder="Years"
+                        value={ageY}
+                        onChange={(e) => setAgeY(e.target.value)}
+                        style={{ textAlign: 'center', padding: '10px 8px', fontSize: '1rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.9rem' }}>M</label>
+                      <input
+                        type="number"
+                        className="input-glass"
+                        placeholder="Months"
+                        value={ageM}
+                        onChange={(e) => setAgeM(e.target.value)}
+                        style={{ textAlign: 'center', padding: '10px 8px', fontSize: '1rem' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '8px', width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => {
+                          if (selectedPatient) showAlert(`Loading complete digital card for Patient ID: ${selectedPatient.id}`, 'Digital Patient Card');
+                          else showAlert('Please search or load a patient first.', 'No Patient Loaded');
+                        }}
+                      >
+                        <FileText size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Right QR block */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  {/* QR display square */}
+                  <div style={{
+                    width: '148px',
+                    height: '148px',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    boxShadow: '0 1px 6px rgba(0,0,0,0.08)'
+                  }}>
+                    <QrCanvas text={qrCodeData} size={140} />
+                  </div>
+
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: '148px', padding: '6px', fontSize: '0.85rem', fontWeight: 'bold' }}
+                    onClick={handleGenerateQrCode}
+                  >
+                    Generate
+                  </button>
+
+                  <div style={{ display: 'flex', gap: '4px', width: '148px' }}>
+                    <button className="btn btn-secondary" style={{ flex: 1, padding: '6px' }} onClick={handleScanQrMock}>
+                      <QrCode size={15} />
+                    </button>
+                    <button className="btn btn-secondary" style={{ flex: 1, padding: '6px' }} onClick={async () => await showAlert('Launching camera view interface for live QR code scanning...', 'Live Scanner')}>
+                      <Camera size={15} />
+                    </button>
+                  </div>
+
+                  <button
+                    className="btn btn-warning"
+                    style={{ width: '148px', padding: '6px', fontSize: '0.85rem' }}
+                    onClick={handleClearForm}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Next Visit Scheduler Dropdown */}
-          <div className="glass-panel" style={{ padding: '14px 20px' }}>
-            <div
-              onClick={() => setShowNextVisitDropdown(!showNextVisitDropdown)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-            >
-              <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Next Visit Schedule</span>
-              {showNextVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </div>
-
-            {showNextVisitDropdown && (
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Vitals row (editable weight/height) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
                 <div>
-                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Next Visit Date</label>
+                  <label className="label-glass" style={{ fontSize: '0.85rem' }}>Weight (kg)</label>
+                  <input type="number" className="input-glass" placeholder="Wt" value={weight} onChange={(e) => setWeight(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                </div>
+                <div>
+                  <label className="label-glass" style={{ fontSize: '0.85rem' }}>Height (cm)</label>
+                  <input type="number" className="input-glass" placeholder="Ht" value={height} onChange={(e) => setHeight(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                </div>
+              </div>
+
+              {/* Date Picker & Visit priority / Category */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Calendar size={16} style={{ opacity: 0.5, flexShrink: 0 }} />
                   <input
                     type="date"
                     className="input-glass"
-                    value={nextVisitDate}
-                    onChange={(e) => setNextVisitDate(e.target.value)}
-                    style={{ padding: '10px 12px', fontSize: '0.95rem' }}
+                    value={visitDateText}
+                    onChange={(e) => setVisitDateText(e.target.value)}
+                    style={{ fontSize: '0.95rem', padding: '9px 8px' }}
                   />
                 </div>
                 <div>
-                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Next Visit Plan</label>
-                  <input
-                    type="text"
+                  <select
                     className="input-glass"
-                    placeholder="e.g. Check Hb levels, review BP"
-                    value={nextVisitPlan}
-                    onChange={(e) => setNextVisitPlan(e.target.value)}
-                    style={{ padding: '10px 12px', fontSize: '0.95rem' }}
-                  />
+                    value={visitPriority}
+                    onChange={(e) => setVisitPriority(e.target.value)}
+                    style={{ fontSize: '0.95rem', padding: '9px 10px', width: '100%' }}
+                  >
+                    {VISIT_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Live Patient Queue List (Selectable) */}
-          <div className="glass-panel" style={{ flex: 1, minHeight: '150px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Waiting Queue Line</h4>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click patient to consult</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
-              {queue.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No patients waiting.</p>
-              ) : (
-                queue.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSelectActiveVisit(item)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: activeVisit?.id === item.id ? 'rgba(0,153,255,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: activeVisit?.id === item.id ? '1px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.05)',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    <span><strong>#{item.queue_number}</strong> - {item.name}</span>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      padding: '2px 6px',
-                      borderRadius: '8px',
-                      background: item.status === 'Active' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                      color: item.status === 'Active' ? 'var(--color-success)' : 'var(--color-warning)'
-                    }}>{item.status}</span>
-                  </div>
-                ))
+            {/* Pink Allergies Warning block */}
+            {allergiesText && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: 'var(--color-danger)',
+                fontSize: '0.85rem',
+                padding: '12px',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <strong style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>Allergies Alert Warning:</strong>
+                <span>{allergiesText}</span>
+              </div>
+            )}
+
+            {/* Diagnosis Dropdown */}
+            <div className="glass-panel" style={{ padding: '14px 20px' }}>
+              <div
+                onClick={() => setShowDiagnosisDropdown(!showDiagnosisDropdown)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Diagnosis & Current Illness</span>
+                {showDiagnosisDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+
+              {showDiagnosisDropdown && (
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <textarea
+                    className="input-glass"
+                    rows={3}
+                    placeholder="Enter diagnosis, illness description, clinical notes..."
+                    value={diagnosis}
+                    onChange={(e) => setDiagnosis(e.target.value)}
+                    style={{ resize: 'none', fontSize: '1rem', padding: '10px 12px' }}
+                  />
+                </div>
               )}
             </div>
-          </div>
+
+            {/* Last Visit Details Dropdown - Enhanced */}
+            <div className="glass-panel" style={{ padding: '14px 20px' }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div
+                  onClick={() => setShowLastVisitDropdown(!showLastVisitDropdown)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}
+                >
+                  <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Last Visit Details &amp; History</span>
+                  {history.length > 0 && (
+                    <span style={{
+                      fontSize: '0.7rem', background: 'var(--accent-blue-bg)', color: 'var(--color-secondary)',
+                      padding: '2px 8px', borderRadius: '10px', fontWeight: '600'
+                    }}>{history.length} visit{history.length !== 1 ? 's' : ''}</span>
+                  )}
+                  {showLastVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </div>
+                {/* All Visits button */}
+                <button
+                  onClick={() => setShowAllVisitsModal(true)}
+                  disabled={history.length === 0}
+                  style={{
+                    background: 'none', border: '1px solid var(--glass-border)', borderRadius: '6px',
+                    padding: '4px 10px', cursor: history.length === 0 ? 'not-allowed' : 'pointer',
+                    color: history.length === 0 ? 'var(--text-muted)' : 'var(--color-secondary)',
+                    fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px',
+                    opacity: history.length === 0 ? 0.5 : 1, transition: 'all 0.2s'
+                  }}
+                  title="View all visits"
+                >
+                  <ExternalLink size={13} /> All Visits
+                </button>
+              </div>
+
+              {showLastVisitDropdown && (
+                <div style={{ marginTop: '12px', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '2px' }}>
+                  {history.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', textAlign: 'center' }}>No previous visit records found.</div>
+                  ) : (
+                    history.map((h, i) => {
+                      const isExpanded = expandedVisitId === h.id;
+                      const visitDate = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                      const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                      return (
+                        <div key={h.id} style={{
+                          background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.15)',
+                          border: i === 0 ? '1px solid rgba(0,153,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                          borderRadius: '10px', fontSize: '0.85rem', overflow: 'hidden'
+                        }}>
+                          {/* Visit card header */}
+                          <div style={{ padding: '10px 12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  width: '8px', height: '8px', borderRadius: '50%',
+                                  background: i === 0 ? '#10b981' : '#64748b', display: 'inline-block', flexShrink: 0
+                                }} />
+                                <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{visitDate}</strong>
+                                {i === 0 && (
+                                  <span style={{ fontSize: '0.68rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '1px 6px', borderRadius: '6px', fontWeight: '700' }}>LAST VISIT</span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
+                            </div>
+
+                            <div style={{ marginBottom: '8px' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                                <strong style={{ color: 'var(--text-primary)' }}>Diagnosis:</strong> {h.diagnosis || 'General Checkup'}
+                              </span>
+                            </div>
+
+                            {/* Expandable prescription table */}
+                            {hasMeds && (
+                              <div>
+                                <button
+                                  onClick={() => setExpandedVisitId(isExpanded ? null : h.id)}
+                                  style={{
+                                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
+                                    color: 'var(--text-secondary)', fontSize: '0.75rem',
+                                    display: 'flex', alignItems: 'center', gap: '4px', marginBottom: isExpanded ? '8px' : '0'
+                                  }}
+                                >
+                                  {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                  {h.prescriptions.length} Medicine(s)
+                                </button>
+
+                                {isExpanded && (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '4px' }}>
+                                    <thead>
+                                      <tr style={{ background: 'rgba(0,153,255,0.08)', borderBottom: '1px solid rgba(0,153,255,0.15)' }}>
+                                        <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Drug</th>
+                                        <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Dosage</th>
+                                        <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Durat..</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {h.prescriptions.map((rx, idx) => (
+                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: '500' }}>{rx.medicine_name}</td>
+                                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--color-secondary)' }}>{rx.dosage}</td>
+                                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{rx.duration_days}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                              <button
+                                onClick={() => handlePrintHistoryVisit(h)}
+                                style={{
+                                  flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                                  borderRadius: '6px', padding: '6px 8px', cursor: 'pointer',
+                                  color: 'var(--text-secondary)', fontSize: '0.75rem',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                  transition: 'all 0.2s'
+                                }}
+                                title="Print this prescription"
+                              >
+                                <Printer size={12} /> Print
+                              </button>
+                              <button
+                                onClick={() => handleRepeatPrescription(h)}
+                                disabled={!hasMeds}
+                                style={{
+                                  flex: 2, background: hasMeds ? 'rgba(0,153,255,0.12)' : 'rgba(0,0,0,0.1)',
+                                  border: `1px solid ${hasMeds ? 'rgba(0,153,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                                  borderRadius: '6px', padding: '6px 10px', cursor: hasMeds ? 'pointer' : 'not-allowed',
+                                  color: hasMeds ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.75rem',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                  opacity: hasMeds ? 1 : 0.5, transition: 'all 0.2s'
+                                }}
+                                title="Use this prescription for current visit"
+                              >
+                                <Copy size={12} /> Use this Prescription
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Laboratory Investigations Panel */}
+            <div className="glass-panel" style={{ padding: '14px 20px' }}>
+              <div
+                onClick={() => setShowLabsDropdown(!showLabsDropdown)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Lab Investigations Log</span>
+                {showLabsDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+
+              {showLabsDropdown && (
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Input current values or review previous entries below.</p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Full Blood Count (FBC)</label>
+                      <input type="text" className="input-glass" placeholder="WBC, RBC, Hb" value={fbc} onChange={(e) => setFbc(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Fasting Blood Sugar (FBS)</label>
+                      <input type="text" className="input-glass" placeholder="mg/dl" value={fbs} onChange={(e) => setFbs(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Lipid Profile</label>
+                      <input type="text" className="input-glass" placeholder="Chol, HDL, LDL" value={lipidProfile} onChange={(e) => setLipidProfile(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Urine Full Report (UFR)</label>
+                      <input type="text" className="input-glass" placeholder="Album, Sugar, Pus" value={ufr} onChange={(e) => setUfr(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>C-Reactive Protein (C-RP)</label>
+                      <input type="text" className="input-glass" placeholder="mg/L" value={crp} onChange={(e) => setCrp(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>ESR</label>
+                      <input type="text" className="input-glass" placeholder="mm/hr" value={esr} onChange={(e) => setEsr(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Dengue NS-1 Ag</label>
+                      <input type="text" className="input-glass" placeholder="Neg/Pos" value={dengueNs1} onChange={(e) => setDengueNs1(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Influenza Ag</label>
+                      <input type="text" className="input-glass" placeholder="Neg/Pos" value={influenzaAg} onChange={(e) => setInfluenzaAg(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Liver Function (LFT)</label>
+                      <input type="text" className="input-glass" placeholder="SGPT, SGOT" value={lft} onChange={(e) => setLft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Thyroid Function (TFT)</label>
+                      <input type="text" className="input-glass" placeholder="TSH, T3, T4" value={tft} onChange={(e) => setTft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label className="label-glass" style={{ fontSize: '0.7rem' }}>Renal Function (RFT)</label>
+                      <input type="text" className="input-glass" placeholder="Urea, Creatinine" value={rft} onChange={(e) => setRft(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Next Visit Scheduler Dropdown */}
+            <div className="glass-panel" style={{ padding: '14px 20px' }}>
+              <div
+                onClick={() => setShowNextVisitDropdown(!showNextVisitDropdown)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>Next Visit Schedule</span>
+                {showNextVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+
+              {showNextVisitDropdown && (
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div>
+                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>Next Visit Date</label>
+                    <input
+                      type="date"
+                      className="input-glass"
+                      value={nextVisitDate}
+                      onChange={(e) => setNextVisitDate(e.target.value)}
+                      style={{ padding: '10px 12px', fontSize: '0.95rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="label-glass" style={{ fontSize: '0.9rem' }}>Next Visit Plan</label>
+                    <input
+                      type="text"
+                      className="input-glass"
+                      placeholder="e.g. Check Hb levels, review BP"
+                      value={nextVisitPlan}
+                      onChange={(e) => setNextVisitPlan(e.target.value)}
+                      style={{ padding: '10px 12px', fontSize: '0.95rem' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Patient Queue List (Selectable) */}
+            <div className="glass-panel" style={{ flex: 1, minHeight: '150px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Waiting Queue Line</h4>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click patient to consult</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+                {queue.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No patients waiting.</p>
+                ) : (
+                  queue.map(item => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectActiveVisit(item)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: activeVisit?.id === item.id ? 'rgba(0,153,255,0.1)' : 'rgba(255,255,255,0.02)',
+                        border: activeVisit?.id === item.id ? '1px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.05)',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      <span><strong>#{item.queue_number}</strong> - {item.name}</span>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 6px',
+                        borderRadius: '8px',
+                        background: item.status === 'Active' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                        color: item.status === 'Active' ? 'var(--color-success)' : 'var(--color-warning)'
+                      }}>{item.status}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </section>
 
           {/* RIGHT COLUMN: Prescription Builder & Dispenser scroll container */}
@@ -1216,239 +1329,239 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0 }}>
 
 
-            {/* Search Inventory & Autofill Row */}
-            <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="Search inventory drugs..."
-                  value={drugSearch}
-                  onChange={(e) => handleDrugSearch(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '11px 42px 11px 16px',
-                    fontSize: '1rem',
-                    borderRadius: '10px',
-                    border: '1.5px solid #d1d5db',
-                    background: '#ffffff',
-                    color: '#111827',
-                    outline: 'none',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                    boxSizing: 'border-box',
-                  }}
-                  onFocus={e => {
-                    e.target.style.borderColor = '#6366f1';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)';
-                  }}
-                  onBlur={e => {
-                    e.target.style.borderColor = '#d1d5db';
-                    e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
-                  }}
-                />
-                <Search size={17} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
-              </div>
-
-              {/* Drug Search dropdown list */}
-              {drugSearchResults.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '50px',
-                  left: 0,
-                  right: 0,
-                  background: '#ffffff',
-                  border: '1.5px solid #e5e7eb',
-                  borderRadius: '10px',
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  zIndex: 20,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                }}>
-                  {drugSearchResults.map(drug => (
-                    <div
-                      key={drug.id}
-                      onClick={() => selectDrugFromLookup(drug)}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #f3f4f6',
-                        fontSize: '0.88rem',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        color: '#111827',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
-                    >
-                      <span><strong>{drug.name}</strong> <span style={{ color: '#6b7280', fontWeight: 400 }}>({drug.type})</span></span>
-                      <span style={{
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        color: drug.stock < drug.notify_threshold ? '#ef4444' : '#10b981',
-                        background: drug.stock < drug.notify_threshold ? '#fef2f2' : '#ecfdf5',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                      }}>
-                        Stock: {drug.stock} | {drug.selling_price} LKR
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Quick Drug Add row */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 1.6fr 0.9fr 1fr 44px',
-              gap: '8px',
-              background: 'rgba(0,0,0,0.1)',
-              padding: '14px',
-              borderRadius: '8px',
-              border: '1px solid var(--glass-border)'
-            }}>
-              <div>
-                <label className="label-glass" style={{ fontSize: '0.9rem' }}>Medicine Name</label>
-                <input type="text" className="input-glass" placeholder="Amoxil, Panadol" value={inputMedName} onChange={(e) => setInputMedName(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
-              </div>
-              <div>
-                <label className="label-glass" style={{ fontSize: '0.9rem' }}>Dosage</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '4px' }}>
-                  <select
-                    className="input-glass"
-                    value={inputDoseQty}
-                    onChange={(e) => setInputDoseQty(e.target.value)}
-                    style={{ padding: '10px 4px', fontSize: '0.95rem', textAlign: 'center' }}
-                    title="Dose Quantity"
-                  >
-                    {DOSE_QUANTITIES.map((q) => (
-                      <option key={q} value={q}>{q}</option>
-                    ))}
-                  </select>
-                  <select
-                    className="input-glass"
-                    value={inputDoseFreq}
-                    onChange={(e) => setInputDoseFreq(e.target.value)}
-                    style={{ padding: '10px 4px', fontSize: '0.95rem', textAlign: 'center' }}
-                    title="Dose Frequency"
-                  >
-                    {DOSE_FREQUENCIES.map((f) => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="label-glass" style={{ fontSize: '0.9rem' }}>Day(s)</label>
-                <input type="number" className="input-glass" placeholder="Days" value={inputDuration} onChange={(e) => setInputDuration(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
-              </div>
-              <div>
-                <label className="label-glass" style={{ fontSize: '0.9rem' }}>Price/tab</label>
-                <input type="number" className="input-glass" placeholder="Price" value={inputPrice} onChange={(e) => setInputPrice(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button className="btn btn-primary" onClick={addPrescribedDrug} style={{ padding: '10px', width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add to Prescription">
-                  <Plus size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Prescribed Items Table */}
-            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: '8px', background: 'rgba(0,0,0,0.15)', minHeight: '150px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-secondary)' }}>Medicine</th>
-                    <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Dosage</th>
-                    <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Days</th>
-                    <th style={{ textAlign: 'right', padding: '12px 16px', color: 'var(--text-secondary)' }}>Total Price</th>
-                    <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)', width: '60px' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prescribedDrugs.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                        No medicines appended to prescription list.
-                      </td>
-                    </tr>
-                  ) : (
-                    prescribedDrugs.map((item, index) => (
-                      <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '10px 14px', fontWeight: '500' }}>{item.medicine_name}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.dosage}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.duration_days}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: 'var(--color-secondary)' }}>{item.price.toFixed(2)} LKR</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <button onClick={() => removePrescribedDrug(index)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer' }}>
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-
-            {/* Billing & Action Footer */}
-            <div style={{
-              background: 'rgba(0,0,0,0.2)',
-              padding: '14px',
-              borderRadius: '10px',
-              border: '1px solid var(--glass-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label className="label-glass" style={{ margin: 0 }}>Consult Fee</label>
+              {/* Search Inventory & Autofill Row */}
+              <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
                   <input
-                    type="number"
-                    className="input-glass"
-                    value={isFoc ? '0' : consultationFee}
-                    onChange={(e) => setConsultationFee(e.target.value)}
-                    style={{ width: '80px', padding: '6px 10px', textAlign: 'center', opacity: isFoc ? 0.6 : 1 }}
-                    disabled={isFoc}
+                    type="text"
+                    placeholder="Search inventory drugs..."
+                    value={drugSearch}
+                    onChange={(e) => handleDrugSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '11px 42px 11px 16px',
+                      fontSize: '1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid #d1d5db',
+                      background: '#ffffff',
+                      color: '#111827',
+                      outline: 'none',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                      transition: 'border-color 0.2s, box-shadow 0.2s',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={e => {
+                      e.target.style.borderColor = '#6366f1';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)';
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = '#d1d5db';
+                      e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
+                    }}
                   />
+                  <Search size={17} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="label-glass" style={{ margin: 0 }}>Free of Charge (FOC)</span>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={isFoc}
-                      onChange={(e) => setIsFoc(e.target.checked)}
-                    />
-                    <span className="slider"></span>
-                  </label>
-                </div>
+                {/* Drug Search dropdown list */}
+                {drugSearchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50px',
+                    left: 0,
+                    right: 0,
+                    background: '#ffffff',
+                    border: '1.5px solid #e5e7eb',
+                    borderRadius: '10px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    zIndex: 20,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  }}>
+                    {drugSearchResults.map(drug => (
+                      <div
+                        key={drug.id}
+                        onClick={() => selectDrugFromLookup(drug)}
+                        style={{
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f3f4f6',
+                          fontSize: '0.88rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          color: '#111827',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                      >
+                        <span><strong>{drug.name}</strong> <span style={{ color: '#6b7280', fontWeight: 400 }}>({drug.type})</span></span>
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          color: drug.stock < drug.notify_threshold ? '#ef4444' : '#10b981',
+                          background: drug.stock < drug.notify_threshold ? '#fef2f2' : '#ecfdf5',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                        }}>
+                          Stock: {drug.stock} | {drug.selling_price} LKR
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bill Summary</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
-                    Total: {totalBill.toFixed(2)} LKR
+              {/* Quick Drug Add row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 1.6fr 0.9fr 1fr 44px',
+                gap: '8px',
+                background: 'rgba(0,0,0,0.1)',
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid var(--glass-border)'
+              }}>
+                <div>
+                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Medicine Name</label>
+                  <input type="text" className="input-glass" placeholder="Amoxil, Panadol" value={inputMedName} onChange={(e) => setInputMedName(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                </div>
+                <div>
+                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Dosage</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '4px' }}>
+                    <select
+                      className="input-glass"
+                      value={inputDoseQty}
+                      onChange={(e) => setInputDoseQty(e.target.value)}
+                      style={{ padding: '10px 4px', fontSize: '0.95rem', textAlign: 'center' }}
+                      title="Dose Quantity"
+                    >
+                      {DOSE_QUANTITIES.map((q) => (
+                        <option key={q} value={q}>{q}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="input-glass"
+                      value={inputDoseFreq}
+                      onChange={(e) => setInputDoseFreq(e.target.value)}
+                      style={{ padding: '10px 4px', fontSize: '0.95rem', textAlign: 'center' }}
+                      title="Dose Frequency"
+                    >
+                      {DOSE_FREQUENCIES.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
+                <div>
+                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Day(s)</label>
+                  <input type="number" className="input-glass" placeholder="Days" value={inputDuration} onChange={(e) => setInputDuration(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                </div>
+                <div>
+                  <label className="label-glass" style={{ fontSize: '0.9rem' }}>Price/tab</label>
+                  <input type="number" className="input-glass" placeholder="Price" value={inputPrice} onChange={(e) => setInputPrice(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <button className="btn btn-primary" onClick={addPrescribedDrug} style={{ padding: '10px', width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add to Prescription">
+                    <Plus size={18} />
+                  </button>
+                </div>
               </div>
 
-              {/* Action buttons */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <button className="btn btn-secondary" onClick={handlePrintPrescription}>
-                  <Printer size={16} /> Print
-                </button>
-                <button className="btn btn-primary" onClick={handleConfirmAndSend}>
-                  <Check size={16} /> Confirm & Send
-                </button>
+              {/* Prescribed Items Table */}
+              <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: '8px', background: 'rgba(0,0,0,0.15)', minHeight: '150px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)' }}>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-secondary)' }}>Medicine</th>
+                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Dosage</th>
+                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Days</th>
+                      <th style={{ textAlign: 'right', padding: '12px 16px', color: 'var(--text-secondary)' }}>Total Price</th>
+                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)', width: '60px' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prescribedDrugs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                          No medicines appended to prescription list.
+                        </td>
+                      </tr>
+                    ) : (
+                      prescribedDrugs.map((item, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '10px 14px', fontWeight: '500' }}>{item.medicine_name}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.dosage}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.duration_days}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', color: 'var(--color-secondary)' }}>{item.price.toFixed(2)} LKR</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            <button onClick={() => removePrescribedDrug(index)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer' }}>
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
+
+
+              {/* Billing & Action Footer */}
+              <div style={{
+                background: 'rgba(0,0,0,0.2)',
+                padding: '14px',
+                borderRadius: '10px',
+                border: '1px solid var(--glass-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label className="label-glass" style={{ margin: 0 }}>Consult Fee</label>
+                    <input
+                      type="number"
+                      className="input-glass"
+                      value={isFoc ? '0' : consultationFee}
+                      onChange={(e) => setConsultationFee(e.target.value)}
+                      style={{ width: '80px', padding: '6px 10px', textAlign: 'center', opacity: isFoc ? 0.6 : 1 }}
+                      disabled={isFoc}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="label-glass" style={{ margin: 0 }}>Free of Charge (FOC)</span>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={isFoc}
+                        onChange={(e) => setIsFoc(e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bill Summary</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
+                      Total: {totalBill.toFixed(2)} LKR
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button className="btn btn-secondary" onClick={handlePrintPrescription}>
+                    <Printer size={16} /> Print
+                  </button>
+                  <button className="btn btn-primary" onClick={handleConfirmAndSend}>
+                    <Check size={16} /> Confirm & Send
+                  </button>
+                </div>
+              </div>
 
             </div>
           </section>

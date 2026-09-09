@@ -510,6 +510,7 @@ input:checked+.slider:before {
     flex-direction: column;
     overflow-y: auto;
   }
+
   .tab-left-col,
   .tab-right-col {
     flex: 0 0 auto;

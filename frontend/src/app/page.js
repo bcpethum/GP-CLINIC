@@ -100,8 +100,8 @@ function AppContent() {
     // Check tab permission for assistants
     const permissionKey = activeTab === 'settings' ? 'settings'
       : activeTab === 'sms' ? 'sms'
-      : activeTab === 'doctor' ? 'doctor'
-      : activeTab;
+        : activeTab === 'doctor' ? 'doctor'
+          : activeTab;
 
     if (user.role === 'assistant' && permissionKey && !hasPermission(permissionKey)) {
       return (
@@ -247,9 +247,7 @@ function AppContent() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Root export — wraps everything with AuthProvider
-// ─────────────────────────────────────────────────────────────────────────────
 export default function Home() {
   return (
     <AuthProvider>

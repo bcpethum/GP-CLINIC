@@ -210,8 +210,8 @@ router.delete('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name, age, telephone, weight, height, allergies } = req.body;
 
-  if (!name || !age || !telephone) {
-    return res.status(400).json({ error: 'Name, age, and telephone number are required' });
+  if (!name || !telephone) {
+    return res.status(400).json({ error: 'Name and telephone number are required' });
   }
 
   try {
@@ -223,7 +223,7 @@ router.post('/', async (req, res) => {
     `;
     const result = await db.query(queryText, [
       name,
-      parseInt(age),
+      age ? parseInt(age) : null,
       telephone,
       weight ? parseFloat(weight) : null,
       height ? parseFloat(height) : null,
@@ -252,7 +252,7 @@ router.put('/:id', async (req, res) => {
     `;
     const result = await db.query(queryText, [
       name,
-      parseInt(age),
+      age ? parseInt(age) : null,
       telephone,
       weight ? parseFloat(weight) : null,
       height ? parseFloat(height) : null,
