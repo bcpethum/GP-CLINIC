@@ -4,6 +4,21 @@ const db = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SSE client registry — maps doctorId → Set of response streams
+// Scoped per-doctor so only the right clinic's assistant gets notified.
+// ─────────────────────────────────────────────────────────────────────────────
+const sseClients = new Map(); // doctorId → Set<res>
+
+function broadcastToDoctor(doctorId, event, data = {}) {
+  const clients = sseClients.get(doctorId);
+  if (!clients || clients.size === 0) return;
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of clients) {
+    try { res.write(payload); } catch (_) { clients.delete(res); }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helper: resolve the owning doctor_id from the authenticated user.
 //   - If the user is a doctor  → their own userId
 //   - If the user is assistant → look up their doctor_id from users table
@@ -16,6 +31,40 @@ async function getDoctorId(req) {
   }
   return result.rows[0].doctor_id;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /queue/events — SSE stream for real-time dispensing notifications
+// Token is passed as ?token= query param (EventSource cannot set headers)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/events', authenticateToken, requirePermission('queue'), async (req, res) => {
+  const doctorId = await getDoctorId(req);
+
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
+  // Send initial ping so client knows it's connected
+  res.write(`event: connected\ndata: {}\n\n`);
+
+  // Register this client
+  if (!sseClients.has(doctorId)) sseClients.set(doctorId, new Set());
+  sseClients.get(doctorId).add(res);
+
+  // Heartbeat every 25s to keep connection alive through proxies/firewalls
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch (_) { clearInterval(heartbeat); }
+  }, 25000);
+
+  // Cleanup on disconnect
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.get(doctorId)?.delete(res);
+  });
+});
 
 // 1. Get today's queue (Pending & Active visits) — scoped to doctor
 router.get('/', authenticateToken, requirePermission('queue'), async (req, res) => {
@@ -290,6 +339,10 @@ router.put('/:id/diagnose', authenticateToken, requirePermission('queue'), async
     }
 
     await db.query('COMMIT');
+
+    // Notify the assistant's dispensing panel in real-time
+    broadcastToDoctor(doctorId, 'dispensing:update', { visitId: parseInt(id) });
+
     res.json({ message: 'Visit diagnostics recorded successfully', visit: visitUpdateRes.rows[0] });
   } catch (err) {
     await db.query('ROLLBACK');
@@ -334,6 +387,68 @@ router.get('/stats', authenticateToken, requirePermission('dashboard'), async (r
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Database error fetching dashboard statistics' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /queue/dispensing
+// Returns today's Completed visits with prescriptions pending dispensing.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/dispensing', authenticateToken, requirePermission('queue'), async (req, res) => {
+  const { date } = req.query;
+  const targetDate = date || new Date().toISOString().split('T')[0];
+  try {
+    const doctorId = await getDoctorId(req);
+
+    // Fetch completed visits for today that have at least one prescription
+    const visitsRes = await db.query(`
+      SELECT v.id, v.queue_number, v.diagnosis, v.total_fee, v.dispensed,
+             p.name, p.age, p.telephone, p.allergies
+      FROM visits v
+      JOIN patients p ON v.patient_id = p.id
+      WHERE v.visit_date = $1
+        AND v.status = 'Completed'
+        AND v.doctor_id = $2
+        AND EXISTS (SELECT 1 FROM prescriptions pr WHERE pr.visit_id = v.id)
+      ORDER BY v.queue_number ASC
+    `, [targetDate, doctorId]);
+
+    const visits = visitsRes.rows;
+
+    // Attach prescriptions to each visit
+    for (const visit of visits) {
+      const rxRes = await db.query(
+        `SELECT medicine_name, dosage, duration_days, price FROM prescriptions WHERE visit_id = $1 ORDER BY id ASC`,
+        [visit.id]
+      );
+      visit.prescriptions = rxRes.rows;
+    }
+
+    res.json(visits);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error fetching dispensing list' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /queue/:id/dispensed
+// Mark a visit's medicines as dispensed by the assistant.
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/:id/dispensed', authenticateToken, requirePermission('queue'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const doctorId = await getDoctorId(req);
+    const result = await db.query(
+      `UPDATE visits SET dispensed = TRUE WHERE id = $1 AND doctor_id = $2 RETURNING id`,
+      [parseInt(id), doctorId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Visit not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error marking dispensed' });
   }
 });
 

@@ -9,9 +9,9 @@ const db = require('../db');
  */
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ')
+  const token = (authHeader && authHeader.startsWith('Bearer ')
     ? authHeader.slice(7)
-    : null;
+    : null) || req.query.token || null;  // fallback for EventSource (SSE)
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required. Please log in.' });

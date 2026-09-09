@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, QrCode, UserPlus, RefreshCw, Send, Check, Printer, X, SlidersHorizontal } from 'lucide-react';
+import { Search, QrCode, UserPlus, RefreshCw, Send, Check, Printer, X, SlidersHorizontal, Package, Clock } from 'lucide-react';
 import QrCanvas from './QrCanvas';
 import { apiFetch } from '../lib/api';
 
@@ -15,15 +15,32 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const searchDebounceRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const searchInputRef = useRef(null);
 
-  // Close suggestions on outside click
+  // Calculate dropdown position from input element
+  const updateDropdownPos = () => {
+    if (searchInputRef.current) {
+      const rect = searchInputRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  };
+
+  // Close suggestions on outside click; also update position on scroll/resize
   useEffect(() => {
     const handler = (e) => { if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setShowSuggestions(false); };
+    const reposition = () => { if (showSuggestions) updateDropdownPos(); };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [showSuggestions]);
 
   // Debounced live search
   const handleSearchInput = useCallback((val) => {
@@ -34,7 +51,8 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
       try {
         const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
         setSearchResults(data);
-        setShowSuggestions(data.length > 0);
+        if (data.length > 0) { updateDropdownPos(); setShowSuggestions(true); }
+        else setShowSuggestions(false);
       } catch { setSearchResults([]); }
     }, 300);
   }, []);
@@ -59,26 +77,102 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   const [qrCodeData, setQrCodeData] = useState('');
   const [queueNumber, setQueueNumber] = useState('1');
   const [visitDate, setVisitDate] = useState(new Date().toISOString().split('T')[0]);
-  const [queueList, setQueueList] = useState([]);
-  const [loadingQueue, setLoadingQueue] = useState(false);
   const [loadingSearch, setLoadingSearch] = useState(false);
 
+  // ── Medicine Dispensing panel state ──
+  const [dispensingList, setDispensingList] = useState([]);
+  const [loadingDispensing, setLoadingDispensing] = useState(false);
+  const [expandedVisitId, setExpandedVisitId] = useState(null);
+  const visitDateRef = useRef(visitDate);
+  useEffect(() => { visitDateRef.current = visitDate; }, [visitDate]);
+
+  // Silent refresh — updates list WITHOUT setting loadingDispensing (no blink)
+  const silentRefresh = useCallback(async (date) => {
+    try {
+      const data = await apiFetch(`/queue/dispensing?date=${date || visitDateRef.current}`);
+      setDispensingList(data);
+      const first = data.find(v => !v.dispensed);
+      if (first) setExpandedVisitId(prev => prev ?? first.id);
+    } catch (err) {
+      console.error('Silent refresh error:', err.message);
+    }
+  }, []);
+
+  // Initial fetch — shows spinner only on first load
+  const fetchDispensing = useCallback(async (date) => {
+    setLoadingDispensing(true);
+    try {
+      const data = await apiFetch(`/queue/dispensing?date=${date || visitDateRef.current}`);
+      setDispensingList(data);
+      const first = data.find(v => !v.dispensed);
+      if (first) setExpandedVisitId(prev => prev ?? first.id);
+    } catch (err) {
+      console.error('Dispensing fetch error:', err.message);
+    } finally {
+      setLoadingDispensing(false);
+    }
+  }, []);
+
+  // Mark medicines as dispensed
+  const handleDone = async (visitId) => {
+    try {
+      await apiFetch(`/queue/${visitId}/dispensed`, { method: 'PUT' });
+      setDispensingList(prev => prev.map(v => v.id === visitId ? { ...v, dispensed: true } : v));
+    } catch (err) {
+      console.error('Dispensed error:', err.message);
+    }
+  };
+
+  // Helper: parse dosage string
+  const parseDosageQty = (dosage = '') => {
+    const parts = dosage.split(/[-\s]+/);
+    const qty = parseFloat(parts[0]) || 1;
+    const freq = (parts[1] || 'TDS').toUpperCase();
+    const freqMap = { M: 1, N: 1, BD: 2, TDS: 3, QDS: 4, '8H': 3, '6H': 4, '4H': 6, '2H': 12, EOD: 0.5, WEEKLY: 0.143, STAT: 1, SOS: 1, VESP: 1, NOON: 1 };
+    return { qty, freq, freqMult: freqMap[freq] ?? 3 };
+  };
+
+  // SSE connection for real-time push + 30s safety-net fallback
   useEffect(() => {
-    fetchQueue();
+    fetchDispensing(visitDate); // Initial load with spinner
+
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gp_clinic_token') : '';
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    let es = null;
+    let fallbackInterval = null;
+
+    const clearFallback = () => { if (fallbackInterval) { clearInterval(fallbackInterval); fallbackInterval = null; } };
+
+    if (token) {
+      es = new EventSource(`${API_BASE}/queue/events?token=${encodeURIComponent(token)}`);
+
+      // Doctor confirmed a patient → silent refresh immediately
+      es.addEventListener('dispensing:update', () => silentRefresh(visitDateRef.current));
+
+      // SSE connected/reconnected → stop fallback polling
+      es.addEventListener('connected', clearFallback);
+
+      // SSE error → start 10s fallback polling until reconnected
+      es.onerror = () => {
+        if (!fallbackInterval) {
+          fallbackInterval = setInterval(() => silentRefresh(visitDateRef.current), 10000);
+        }
+      };
+    }
+
+    // 30s safety-net poll even when SSE is healthy (catches edge cases)
+    const safetyNet = setInterval(() => silentRefresh(visitDateRef.current), 30000);
+
+    return () => {
+      es?.close();
+      clearFallback();
+      clearInterval(safetyNet);
+    };
   }, [visitDate]);
 
   const fetchQueue = async () => {
-    setLoadingQueue(true);
-    try {
-      const data = await apiFetch(`/queue?date=${visitDate}`);
-      setQueueList(data);
-      const maxQueue = data.reduce((max, item) => item.queue_number > max ? item.queue_number : max, 0);
-      setQueueNumber((maxQueue + 1).toString());
-    } catch (err) {
-      console.error('Error fetching queue:', err.message);
-    } finally {
-      setLoadingQueue(false);
-    }
+    // kept for legacy compatibility — dispensing now handles the right panel
+    fetchDispensing(visitDate);
   };
 
   const handleSearch = async () => {
@@ -278,45 +372,18 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
               <div style={{ display: 'flex', gap: '8px' }} ref={searchBoxRef}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
+                    ref={searchInputRef}
                     type="text"
                     className="input-glass"
                     placeholder="Search by Tel No or Name"
                     value={searchQuery}
                     onChange={e => handleSearchInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); handleSearch(); } if (e.key === 'Escape') setShowSuggestions(false); }}
-                    onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
+                    onFocus={() => { if (searchResults.length > 0) { updateDropdownPos(); setShowSuggestions(true); } }}
                     style={{ paddingRight: '36px' }}
                     autoComplete="off"
                   />
                   <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-
-                  {/* Live autocomplete dropdown */}
-                  {showSuggestions && searchResults.length > 0 && (
-                    <ul style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0,
-                      background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
-                      listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
-                      maxHeight: '220px', overflowY: 'auto'
-                    }}>
-                      {searchResults.slice(0, 6).map(p => (
-                        <li
-                          key={p.id}
-                          onMouseDown={() => selectPatient(p)}
-                          style={{
-                            padding: '9px 14px', cursor: 'pointer', display: 'flex',
-                            flexDirection: 'column', gap: '2px',
-                            borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
-                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowSuggestions(false); handleSearch(); }} disabled={loadingSearch} style={{ padding: '10px 14px' }}>
                   {loadingSearch ? '...' : <Search size={16} />}
@@ -448,76 +515,156 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
 
           </section>
 
-          {/* RIGHT: Queue View */}
+          {/* RIGHT: Medicine Dispensing Panel */}
           <section className="right-scroll-container">
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0 }}>
+
+              {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.2rem' }}>Realtime Patient Queue</h3>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Date: {visitDate}</span>
+                  <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <Package size={18} style={{ color: 'var(--color-primary)' }} />
+                    Medicine Dispensing
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Date: {visitDate} · Auto-refreshes every 15s</span>
                 </div>
-                <button className="btn btn-secondary" onClick={fetchQueue} disabled={loadingQueue} style={{ padding: '8px 12px' }}>
-                  <RefreshCw size={14} /> Refresh
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input type="date" className="input-glass" value={visitDate} onChange={e => setVisitDate(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.82rem' }} />
+                  <button className="btn btn-secondary" onClick={() => fetchDispensing(visitDate)} disabled={loadingDispensing} style={{ padding: '7px 12px' }}>
+                    <RefreshCw size={14} />
+                  </button>
+                </div>
               </div>
 
-              {loadingQueue ? (
-                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>Loading queue...</div>
-              ) : queueList.length === 0 ? (
-                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--glass-border)', borderRadius: '8px', padding: '40px' }}>
-                  <UserPlus size={48} style={{ marginBottom: '10px', opacity: 0.5 }} />
-                  <p>Queue is empty for today.</p>
+              {/* Content */}
+              {loadingDispensing ? (
+                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '8px' }}>
+                  <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                </div>
+              ) : dispensingList.length === 0 ? (
+                <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed var(--glass-border)', borderRadius: '10px', padding: '40px', gap: '10px' }}>
+                  <Clock size={40} style={{ opacity: 0.4 }} />
+                  <p style={{ fontSize: '0.9rem' }}>Waiting for doctor to complete a visit...</p>
+                  <p style={{ fontSize: '0.78rem', opacity: 0.7 }}>Prescriptions will appear here automatically.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1 }}>
-                  {queueList.map(item => {
-                    const isActive = item.status === 'Active';
+                  {dispensingList.map(visit => {
+                    const isExpanded = expandedVisitId === visit.id;
+                    const isDone = visit.dispensed;
+
                     return (
                       <div
-                        key={item.id}
+                        key={visit.id}
                         style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: isActive ? 'rgba(0, 119, 230, 0.08)' : 'rgba(0,100,200,0.03)',
-                          border: isActive ? '1px solid var(--color-primary)' : '1px solid rgba(0,100,200,0.12)',
-                          borderRadius: '10px', padding: '12px 18px'
+                          border: isDone ? '1px solid #d1fae5' : '1.5px solid var(--color-primary)',
+                          borderRadius: '12px',
+                          background: isDone ? 'rgba(16,185,129,0.04)' : 'rgba(0,100,200,0.04)',
+                          overflow: 'hidden',
+                          opacity: isDone ? 0.7 : 1,
+                          transition: 'all 0.2s'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                          <div style={{
-                            background: isActive ? 'var(--color-primary)' : 'rgba(0,100,200,0.1)',
-                            width: '40px', height: '40px', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontWeight: 'bold', fontSize: '1.1rem',
-                            color: isActive ? 'white' : 'var(--color-primary)'
-                          }}>
-                            {item.queue_number}
+                        {/* Card header — clickable to expand/collapse */}
+                        <div
+                          onClick={() => setExpandedVisitId(isExpanded ? null : visit.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '12px 16px', cursor: 'pointer',
+                            background: isDone ? 'rgba(16,185,129,0.07)' : 'rgba(0,100,200,0.06)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                              background: isDone ? '#10b981' : 'var(--color-primary)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontWeight: '700', fontSize: '0.9rem', color: '#fff'
+                            }}>
+                              {visit.queue_number}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: '700', fontSize: '0.97rem', color: isDone ? '#059669' : 'var(--text-primary)' }}>
+                                {visit.name}{visit.age ? ` (${visit.age} yrs)` : ''}
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {visit.prescriptions?.length || 0} medicine{visit.prescriptions?.length !== 1 ? 's' : ''}
+                                {isDone && <span style={{ marginLeft: '8px', color: '#10b981', fontWeight: '600' }}>✓ Dispensed</span>}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div style={{ fontWeight: '600', fontSize: '1rem', color: isActive ? 'var(--color-primary)' : 'var(--text-primary)' }}>{item.name}</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{item.telephone} | {item.age} yrs</div>
-                            {item.allergies && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--color-danger)', background: 'rgba(239,68,68,0.1)', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', marginTop: '4px' }}>
-                                Allergies: {item.allergies}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {visit.total_fee > 0 && (
+                              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--color-primary)' }}>
+                                Rs. {parseFloat(visit.total_fee).toLocaleString()}
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isExpanded ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+
+                        {/* Expanded: medicines table */}
+                        {isExpanded && (
+                          <div style={{ padding: '12px 16px 14px' }}>
+                            {/* Allergy warning */}
+                            {visit.allergies && (
+                              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', padding: '6px 12px', marginBottom: '10px', fontSize: '0.8rem', color: '#dc2626', fontWeight: '600' }}>
+                                ⚠ Allergies: {visit.allergies}
                               </div>
                             )}
+
+                            {/* Medicines table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                              <thead>
+                                <tr style={{ background: 'rgba(0,100,200,0.06)', color: 'var(--text-secondary)' }}>
+                                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '600', borderRadius: '6px 0 0 6px' }}>#</th>
+                                  <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '600' }}>Medicine</th>
+                                  <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: '600' }}>Freq</th>
+                                  <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: '600' }}>Qty</th>
+                                  <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: '600' }}>Days</th>
+                                  <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: '600', borderRadius: '0 6px 6px 0' }}>Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {visit.prescriptions?.map((rx, i) => {
+                                  const parts = (rx.dosage || '').split(/[-\s]+/);
+                                  const qty = parseFloat(parts[0]) || 1;
+                                  const freq = (parts[1] || 'TDS').toUpperCase();
+                                  const freqMap = { M: 1, N: 1, BD: 2, TDS: 3, QDS: 4, '8H': 3, '6H': 4, '4H': 6, EOD: 0.5, WEEKLY: 0.143, STAT: 1, SOS: 1, VESP: 1, NOON: 1 };
+                                  const freqMult = freqMap[freq] ?? 3;
+                                  const totalQty = freq === 'STAT' ? Math.ceil(qty) : Math.ceil(qty * freqMult * (rx.duration_days || 3));
+                                  return (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                      <td style={{ padding: '7px 10px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{i + 1}.</td>
+                                      <td style={{ padding: '7px 10px', fontWeight: '600', color: 'var(--text-primary)' }}>{rx.medicine_name}</td>
+                                      <td style={{ padding: '7px 8px', textAlign: 'center', color: 'var(--color-secondary)' }}>{freq}</td>
+                                      <td style={{ padding: '7px 8px', textAlign: 'center' }}>{qty}</td>
+                                      <td style={{ padding: '7px 8px', textAlign: 'center' }}>{rx.duration_days}</td>
+                                      <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: '700', color: 'var(--color-primary)' }}>{totalQty}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+
+                            {/* Done button */}
+                            {!isDone && (
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px', gap: '8px' }}>
+                                <button
+                                  className="btn btn-primary"
+                                  style={{ padding: '9px 24px', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '7px' }}
+                                  onClick={() => handleDone(visit.id)}
+                                >
+                                  <Check size={16} /> Done — Medicines Given
+                                </button>
+                              </div>
+                            )}
+                            {isDone && (
+                              <div style={{ textAlign: 'center', marginTop: '10px', color: '#10b981', fontWeight: '700', fontSize: '0.88rem' }}>✓ Medicines dispensed</div>
+                            )}
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{
-                            fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', fontWeight: '600',
-                            background: isActive ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.15)',
-                            color: isActive ? 'var(--color-success)' : 'var(--color-warning)'
-                          }}>
-                            {item.status}
-                          </span>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => selectPatient({ id: item.patient_id, name: item.name, telephone: item.telephone, age: item.age, weight: item.weight, height: item.height, allergies: item.allergies })}
-                            style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                          >
-                            Edit
-                          </button>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
@@ -648,6 +795,42 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
             </div>
           </div>
         </div>
+      )}
+      {/* Fixed-position autocomplete dropdown — renders above ALL containers */}
+      {showSuggestions && searchResults.length > 0 && (
+        <ul style={{
+          position: 'fixed',
+          top: dropdownPos.top,
+          left: dropdownPos.left,
+          width: dropdownPos.width,
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
+          zIndex: 999999,
+          listStyle: 'none',
+          margin: 0,
+          padding: '4px 0',
+          maxHeight: '260px',
+          overflowY: 'auto'
+        }}>
+          {searchResults.slice(0, 8).map(p => (
+            <li
+              key={p.id}
+              onMouseDown={() => selectPatient(p)}
+              style={{
+                padding: '10px 16px', cursor: 'pointer', display: 'flex',
+                flexDirection: 'column', gap: '3px',
+                borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>{p.name}</span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}{p.age ? ` | ${p.age} yrs` : ''}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </>
   );
