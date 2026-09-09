@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS visits (
     total_fee       NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     paid_amount     NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     is_foc          BOOLEAN        NOT NULL DEFAULT FALSE,
+    dispensed       BOOLEAN        NOT NULL DEFAULT FALSE,
     doctor_id       INTEGER        REFERENCES users(id) ON DELETE SET NULL,
     created_at      TIMESTAMP      DEFAULT CURRENT_TIMESTAMP
 );
@@ -229,6 +230,8 @@ BEGIN
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE visits ADD COLUMN IF NOT EXISTS dispensed BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- PATCH: Add doctor_id to older tables that may not have it yet
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE patients     ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
