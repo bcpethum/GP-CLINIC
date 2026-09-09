@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Upload, FileText, Image as ImageIcon, Calendar, Edit2, Check, RefreshCw, Trash2, Eye, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
@@ -10,6 +10,33 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
   const [loading, setLoading] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [dateFilter, setDateFilter] = useState('all');
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchDebounceRef = useRef(null);
+  const searchBoxRef = useRef(null);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e) => { if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setShowSuggestions(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Debounced live suggest
+  const handleSearchInput = useCallback((val) => {
+    setSearchQuery(val);
+    clearTimeout(searchDebounceRef.current);
+    if (!val.trim()) { setSuggestions([]); setShowSuggestions(false); return; }
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
+        setSuggestions(data.slice(0, 6));
+        setShowSuggestions(data.length > 0);
+      } catch { setSuggestions([]); }
+    }, 300);
+  }, []);
 
   // Edit Mode state
   const [editMode, setEditMode] = useState(false);
@@ -216,18 +243,48 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
 
           {/* Search Row */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
+            <div style={{ flex: 1, position: 'relative' }} ref={searchBoxRef}>
               <input
                 type="text"
                 className="input-glass"
                 placeholder="Name or Telephone..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchPatients(searchQuery)}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { setShowSuggestions(false); fetchPatients(searchQuery); } if (e.key === 'Escape') setShowSuggestions(false); }}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                autoComplete="off"
               />
               <Search size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <ul style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+                  listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
+                  maxHeight: '220px', overflowY: 'auto'
+                }}>
+                  {suggestions.map(p => (
+                    <li
+                      key={p.id}
+                      onMouseDown={() => { setShowSuggestions(false); setSearchQuery(p.name); fetchPatients(p.name); handleSelectPatient(p); }}
+                      style={{
+                        padding: '9px 14px', cursor: 'pointer', display: 'flex',
+                        flexDirection: 'column', gap: '2px',
+                        borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <button className="btn btn-primary" onClick={() => fetchPatients(searchQuery)}>
+            <button className="btn btn-primary" onClick={() => { setShowSuggestions(false); fetchPatients(searchQuery); }}>
               Go
             </button>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, QrCode, UserPlus, RefreshCw, Send, Check, Printer, X, SlidersHorizontal } from 'lucide-react';
 import QrCanvas from './QrCanvas';
 import { apiFetch } from '../lib/api';
@@ -14,6 +14,30 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchDebounceRef = useRef(null);
+  const searchBoxRef = useRef(null);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e) => { if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setShowSuggestions(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Debounced live search
+  const handleSearchInput = useCallback((val) => {
+    setSearchQuery(val);
+    clearTimeout(searchDebounceRef.current);
+    if (!val.trim()) { setSearchResults([]); setShowSuggestions(false); return; }
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/patients?search=${encodeURIComponent(val)}`);
+        setSearchResults(data);
+        setShowSuggestions(data.length > 0);
+      } catch { setSearchResults([]); }
+    }, 300);
+  }, []);
 
   // Selected/Form Patient state
   const [patientId, setPatientId] = useState(null);
@@ -79,6 +103,7 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
     setHeight(patient.height ? patient.height.toString() : '');
     setAllergies(patient.allergies || '');
     setSearchResults([]);
+    setShowSuggestions(false);
     setSearchQuery('');
     setQrCodeData(`patient:${patient.id}:${patient.name}:${patient.telephone}`);
   };
@@ -109,14 +134,14 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   };
 
   const handleUpdateOnly = async () => {
-    if (!name || !telephone || !age) {
-      await showAlert('Please enter Name, Telephone, and Age.', 'Input Error');
+    if (!name || !telephone) {
+      await showAlert('Please enter Name and Telephone number.', 'Input Error');
       return;
     }
     const payload = {
       name,
       telephone,
-      age: parseInt(age),
+      age: age ? parseInt(age) : null,
       weight: weight ? parseFloat(weight) : null,
       height: height ? parseFloat(height) : null,
       allergies
@@ -134,14 +159,14 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   };
 
   const handleUpdateAndSend = async () => {
-    if (!name || !telephone || !age) {
-      await showAlert('Please enter Name, Telephone, and Age.', 'Input Error');
+    if (!name || !telephone) {
+      await showAlert('Please enter Name and Telephone number.', 'Input Error');
       return;
     }
     const payload = {
       name,
       telephone,
-      age: parseInt(age),
+      age: age ? parseInt(age) : null,
       weight: weight ? parseFloat(weight) : null,
       height: height ? parseFloat(height) : null,
       allergies
@@ -250,25 +275,56 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
             {/* Search Panel */}
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>Search Patient</h3>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }} ref={searchBoxRef}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
                     type="text"
                     className="input-glass"
                     placeholder="Search by Tel No or Name"
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    onChange={e => handleSearchInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); handleSearch(); } if (e.key === 'Escape') setShowSuggestions(false); }}
+                    onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
                     style={{ paddingRight: '36px' }}
+                    autoComplete="off"
                   />
                   <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+
+                  {/* Live autocomplete dropdown */}
+                  {showSuggestions && searchResults.length > 0 && (
+                    <ul style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0,
+                      background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 9999,
+                      listStyle: 'none', margin: '4px 0 0', padding: '4px 0',
+                      maxHeight: '220px', overflowY: 'auto'
+                    }}>
+                      {searchResults.slice(0, 6).map(p => (
+                        <li
+                          key={p.id}
+                          onMouseDown={() => selectPatient(p)}
+                          style={{
+                            padding: '9px 14px', cursor: 'pointer', display: 'flex',
+                            flexDirection: 'column', gap: '2px',
+                            borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#1e293b' }}>{p.name}</span>
+                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{p.telephone}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <button className="btn btn-primary" onClick={handleSearch} disabled={loadingSearch} style={{ padding: '10px 14px' }}>
+                <button className="btn btn-primary" onClick={() => { setShowSuggestions(false); handleSearch(); }} disabled={loadingSearch} style={{ padding: '10px 14px' }}>
                   {loadingSearch ? '...' : <Search size={16} />}
                 </button>
               </div>
 
-              {searchResults.length > 0 && (
+              {/* Fallback results list (shown when suggestions hidden but results exist) */}
+              {!showSuggestions && searchResults.length > 0 && (
                 <div style={{ background: '#ffffff', border: '1px solid rgba(0,100,200,0.15)', borderRadius: '8px', maxHeight: '160px', overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,80,180,0.1)' }}>
                   {searchResults.map(p => (
                     <div
