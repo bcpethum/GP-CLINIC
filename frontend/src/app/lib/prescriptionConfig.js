@@ -116,7 +116,15 @@ export function buildPrescriptionHtml({
   queueNumber = 1,
   prescriptions = [],
   qrImageSrc = '',
-  planOfAction = ''
+  planOfAction = '',
+  includeNextVisit = false,
+  nextVisitDate = '',
+  includePastHistory = false,
+  pastHistory = [],
+  removeHeader = false,
+  removeFooter = false,
+  rxInside = true,
+  rxOutside = true
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
 
@@ -432,6 +440,7 @@ export function buildPrescriptionHtml({
   <div class="prescription-container">
     <div>
       <!-- TOP HEADER -->
+      ${!removeHeader ? `
       <table class="header-table">
         <tr>
           <!-- Top Left: Clinic Logo -->
@@ -463,6 +472,7 @@ export function buildPrescriptionHtml({
         <div class="ref-no-text">Ref No: ${refNo}</div>
         <hr class="header-hr" />
       </div>
+      ` : ''}
 
       <!-- PATIENT DETAILS -->
       <div class="patient-info-block">
@@ -482,44 +492,81 @@ export function buildPrescriptionHtml({
         ` : ''}
       </div>
 
-      <!-- RX MEDICINE PRESCRIPTION TABLE -->
-      <div>
-        <div class="rx-header-title">${config.rxTitle || 'Rx : (Outside)'}</div>
-        <table class="rx-table">
-          <thead>
-            <tr class="rx-th-row">
-              <th>Medicine</th>
-              <th>Dosage</th>
-              <th>Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${prescriptions && prescriptions.length > 0 ? prescriptions.map(item => `
+      <!-- RX MEDICINE PRESCRIPTION TABLE(S) -->
+      ${ (() => {
+        const insideMeds = prescriptions.filter(p => !p.is_outside);
+        const outsideMeds = prescriptions.filter(p => p.is_outside);
+        const showInside = rxInside && insideMeds.length > 0;
+        const showOutside = rxOutside && outsideMeds.length > 0;
+        const showBoth = showInside && showOutside;
+        const showNone = !showInside && !showOutside;
+
+        const buildTable = (items, title, titleColor) => `
+          <div style="margin-bottom: ${showBoth ? '10px' : '0'};">
+            <div class="rx-header-title" style="color: ${titleColor};">${title}</div>
+            <table class="rx-table">
+              <thead>
+                <tr class="rx-th-row">
+                  <th>Medicine</th>
+                  <th>Dosage</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(item => `
+                  <tr class="rx-item-tr">
+                    <td><span class="rx-item-name">${item.medicine_name}</span></td>
+                    <td><span class="rx-item-dosage" style="display:inline-flex;align-items:center;gap:10px;">${(() => { const p=(item.dosage||'').trim().split(/\s+/); return p.length>=2 ? `<span>${p[0]}</span><span>${p.slice(1).join(' ')}</span>` : item.dosage; })()}</span></td>
+                    <td><span class="rx-item-duration">${item.duration_days} Days</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        if (showNone) return `
+          <div>
+            <div class="rx-header-title">${config.rxTitle || 'Rx : (Outside)'}</div>
+            <table class="rx-table"><tbody>
               <tr class="rx-item-tr">
-                <td><span class="rx-item-name">${item.medicine_name}</span></td>
-                <td><span class="rx-item-dosage">${item.dosage}</span></td>
-                <td><span class="rx-item-duration">${item.duration_days} Days</span></td>
+                <td colspan="3" style="color:#64748b;font-style:italic;text-align:center;padding:18px;">No medicine items issued on this prescription.</td>
               </tr>
-            `).join('') : `
-              <tr class="rx-item-tr">
-                <td colspan="3" style="color: #64748b; font-style: italic; text-align: center; padding: 18px;">
-                  No medicine items issued on this prescription.
-                </td>
-              </tr>
-            `}
-          </tbody>
-        </table>
-      </div>
+            </tbody></table>
+          </div>`;
+
+        return [
+          showInside ? buildTable(insideMeds, 'Rx : (Inside)', '#0077e6') : '',
+          showOutside ? buildTable(outsideMeds, 'Rx : (Outside)', '#0f172a') : ''
+        ].join('');
+      })() }
 
       ${planOfAction ? `
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 12.5px; page-break-inside: avoid;">
-          <strong style="color: #0369a1;">Clinical Advice / Next Plan:</strong> ${planOfAction}
+          <strong style="color: #0369a1;">Remarks / Clinical Advice:</strong> ${planOfAction}
+        </div>
+      ` : ''}
+      ${includeNextVisit && nextVisitDate ? `
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 12.5px; page-break-inside: avoid;">
+          <strong style="color: #15803d;">Next Visit Date:</strong> ${nextVisitDate}
+        </div>
+      ` : ''}
+      ${includePastHistory && pastHistory && pastHistory.length > 0 ? `
+        <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 11.5px; page-break-inside: avoid;">
+          <strong style="color: #7c3aed; display:block; margin-bottom:4px;">Past Medical History:</strong>
+          ${pastHistory.slice(0, 5).map(h => `
+            <div style="margin-bottom:3px; border-bottom:1px dashed #e9d5ff; padding-bottom:3px;">
+              <span style="font-weight:700; color:#1e293b;">${new Date(h.visit_date).toLocaleDateString()}</span>
+              ${h.diagnosis ? ` — <span style="color:#334155;">${h.diagnosis}</span>` : ''}
+            </div>
+          `).join('')}
         </div>
       ` : ''}
     </div>
 
     <!-- BOTTOM SIGN-OFF, SEAL & FOOTER -->
     <div>
+      ${!removeFooter ? `
       <div class="bottom-sign-area">
         <!-- Date & Doctor Seal -->
         <div class="sign-left-col">
@@ -558,6 +605,7 @@ export function buildPrescriptionHtml({
           ` : ''}
         </div>
       </div>
+      ` : ''}
     </div>
   </div>
 </body>

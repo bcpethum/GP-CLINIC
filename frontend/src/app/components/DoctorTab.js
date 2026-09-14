@@ -1620,6 +1620,8 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         prescriptions={prescribedDrugs}
         diagnosis={diagnosis}
         nextVisitPlan={nextVisitPlan}
+        nextVisitDate={nextVisitDate}
+        history={history}
         consultationFee={effectiveConsultFee}
         totalBill={totalBill}
         isFoc={isFoc}
