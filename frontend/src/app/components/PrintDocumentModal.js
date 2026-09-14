@@ -153,6 +153,8 @@ export default function PrintDocumentModal({
   prescriptions = [],
   diagnosis = '',
   nextVisitPlan = '',
+  nextVisitDate = '',
+  history = [],
   consultationFee = 0,
   totalBill = 0,
   isFoc = false,
@@ -213,6 +215,21 @@ export default function PrintDocumentModal({
     setSelectedDoc('referral');
   };
 
+  // Compute filtered prescription list based on rxInside/rxOutside checkboxes
+  const getFilteredPrescriptions = () => {
+    const hasInside = prescriptions.some(p => !p.is_outside);
+    const hasOutside = prescriptions.some(p => p.is_outside);
+    // If neither category exists in data, return all
+    if (!hasInside && !hasOutside) return prescriptions;
+    // If both checkboxes checked (or neither), return all
+    if (rxInside && rxOutside) return prescriptions;
+    if (!rxInside && !rxOutside) return prescriptions;
+    // Filter to selected category
+    if (rxInside && !rxOutside) return prescriptions.filter(p => !p.is_outside);
+    if (rxOutside && !rxInside) return prescriptions.filter(p => p.is_outside);
+    return prescriptions;
+  };
+
   const handlePrint = async () => {
     let htmlContent = '';
 
@@ -235,7 +252,13 @@ export default function PrintDocumentModal({
         qrImageSrc,
         planOfAction: remarks || nextVisitPlan,
         includeNextVisit,
+        nextVisitDate,
         includePastHistory,
+        pastHistory: history,
+        removeHeader,
+        removeFooter,
+        rxInside,
+        rxOutside,
       });
     } else if (selectedDoc === 'medical_certificate') {
       htmlContent = buildMedicalCertificateHtml({
@@ -321,7 +344,7 @@ export default function PrintDocumentModal({
           qrImageSrc = await QRCode.toDataURL(qrCodeData);
         } catch (err) { console.error('QR error:', err); }
       }
-      htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, includePastHistory });
+      htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, nextVisitDate, includePastHistory, pastHistory: history, removeHeader, removeFooter, rxInside, rxOutside });
     } else if (selectedDoc === 'medical_certificate') {
       htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms });
     } else if (selectedDoc === 'medical_bill') {
@@ -391,7 +414,7 @@ export default function PrintDocumentModal({
         if (qrCodeData) {
           try { const QRCode = (await import('qrcode')).default; qrImageSrc = await QRCode.toDataURL(qrCodeData); } catch { }
         }
-        htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, includePastHistory });
+        htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, nextVisitDate, includePastHistory, pastHistory: history, removeHeader, removeFooter, rxInside, rxOutside });
       } else if (selectedDoc === 'medical_certificate') {
         htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms });
       } else if (selectedDoc === 'medical_bill') {

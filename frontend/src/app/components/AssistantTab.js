@@ -314,7 +314,7 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
         </head>
         <body onload="window.print();window.close()">
           <div class="card">
-            <h2>DOCWALLET CLINIC</h2>
+            <h2>GP CLINIC</h2>
             <p style="color: #666; margin: 0; font-size: 13px;">Patient Check-in Token</p>
             <div class="meta">Queue No: ${queueNumber}</div>
             ${qrImageSrc ? `<img src="${qrImageSrc}" width="120" height="120" />` : ''}
