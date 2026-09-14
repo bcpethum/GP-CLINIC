@@ -518,3 +518,9 @@ input:checked+.slider:before {
     padding-right: 0;
   }
 }
+
+/* Active Queue pulse animation */
+@keyframes queuePulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(16,185,129,0.3); }
+  50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0.08); }
+}

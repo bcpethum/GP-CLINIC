@@ -685,18 +685,34 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           alignItems: 'center',
           background: 'rgba(0,100,200,0.05)',
           border: '1px solid rgba(0,100,200,0.12)',
-          borderRadius: '12px',
-          padding: '12px 24px'
+          borderRadius: '20px',
+          padding: '5px 16px'
         }}>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>Doctor Panel</h3>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>Doctor Panel</h3>
             <span style={{
-              fontSize: '0.8rem',
-              background: 'var(--accent-blue-bg)',
-              color: 'var(--color-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              background: 'rgba(16,185,129,0.12)',
+              color: '#059669',
+              border: '1.5px solid rgba(16,185,129,0.35)',
               padding: '3px 10px',
-              borderRadius: '12px'
-            }}>Active Queue: {queue.length} Patients</span>
+              borderRadius: '20px',
+              letterSpacing: '0.2px'
+            }}>
+              <span style={{
+                width: 7, height: 7,
+                borderRadius: '50%',
+                background: '#10b981',
+                display: 'inline-block',
+                boxShadow: '0 0 0 2px rgba(16,185,129,0.3)',
+                animation: 'queuePulse 1.8s ease-in-out infinite'
+              }} />
+              Active Queue: {queue.length} Patients
+            </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>

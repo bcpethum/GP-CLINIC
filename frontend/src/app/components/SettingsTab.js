@@ -557,9 +557,9 @@ function PrescriptionDesignSection({ showAlert }) {
 
   const handleTestPrint = () => {
     const sampleItems = [
-      { medicine_name: 'Paracetamol 500mg', dosage: '1-0-1', duration_days: 3 },
-      { medicine_name: 'Amoxicillin 500mg', dosage: '1 tds', duration_days: 5 },
-      { medicine_name: 'Cetirizine 10mg', dosage: '0-0-1', duration_days: 3 }
+      { medicine_name: 'Paracetamol 500mg', dosage: '2 8H', duration_days: 3, is_outside: false },
+      { medicine_name: 'Amoxicillin 500mg', dosage: '1 TDS', duration_days: 5, is_outside: false },
+      { medicine_name: 'Cetirizine 10mg', dosage: '1 6H', duration_days: 3, is_outside: true }
     ];
 
     const html = buildPrescriptionHtml({
@@ -1053,7 +1053,7 @@ function PrescriptionDesignSection({ showAlert }) {
 
             {/* Rx Section */}
             <div>
-              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>{config.rxTitle || 'Rx : (Outside)'}</div>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>Rx : (Inside)</div>
 
               {/* Header Pill */}
               <div style={{
@@ -1076,17 +1076,21 @@ function PrescriptionDesignSection({ showAlert }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '6px 12px', borderBottom: '1px dashed #e2e8f0', fontSize: '12.5px' }}>
                   <span style={{ fontWeight: '700', color: '#0f172a' }}>Paracetamol 500mg</span>
-                  <span style={{ fontWeight: '600' }}>1-0-1</span>
+                  <span style={{ fontWeight: '600', display: 'inline-flex', gap: '8px' }}><span>2</span><span>8H</span></span>
                   <span style={{ fontWeight: '600', color: '#475569' }}>3 Days</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '6px 12px', borderBottom: '1px dashed #e2e8f0', fontSize: '12.5px' }}>
                   <span style={{ fontWeight: '700', color: '#0f172a' }}>Amoxicillin 500mg</span>
-                  <span style={{ fontWeight: '600' }}>1 tds</span>
+                  <span style={{ fontWeight: '600', display: 'inline-flex', gap: '8px' }}><span>1</span><span>TDS</span></span>
                   <span style={{ fontWeight: '600', color: '#475569' }}>5 Days</span>
                 </div>
+              </div>
+
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', marginBottom: '6px', marginTop: '10px' }}>Rx : (Outside)</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', padding: '6px 12px', borderBottom: '1px dashed #e2e8f0', fontSize: '12.5px' }}>
                   <span style={{ fontWeight: '700', color: '#0f172a' }}>Cetirizine 10mg</span>
-                  <span style={{ fontWeight: '600' }}>0-0-1</span>
+                  <span style={{ fontWeight: '600', display: 'inline-flex', gap: '8px' }}><span>1</span><span>6H</span></span>
                   <span style={{ fontWeight: '600', color: '#475569' }}>3 Days</span>
                 </div>
               </div>
