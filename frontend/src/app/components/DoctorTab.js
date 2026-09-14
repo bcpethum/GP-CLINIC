@@ -191,9 +191,12 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   // Prescription builder state
   const [prescribedDrugs, setPrescribedDrugs] = useState([]);
 
-  // Medicine Inventory Lookup search
-  const [drugSearch, setDrugSearch] = useState('');
-  const [drugSearchResults, setDrugSearchResults] = useState([]);
+  // Medicine Name box search (integrated inventory lookup)
+  const [medNameSearch, setMedNameSearch] = useState('');
+  const [medNameResults, setMedNameResults] = useState([]);
+  const [showMedNameDropdown, setShowMedNameDropdown] = useState(false);
+  const medNameRef = useRef(null);
+  const medNameDebounceRef = useRef(null);
 
   // Form input drug details
   const [inputMedName, setInputMedName] = useState('');
@@ -449,29 +452,43 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     }
   };
 
-  const handleDrugSearch = async (query) => {
-    setDrugSearch(query);
-    if (!query.trim()) {
-      setDrugSearchResults([]);
-      return;
-    }
-    try {
-      const data = await apiFetch(`/drugs?search=${encodeURIComponent(query)}`);
-      setDrugSearchResults(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Integrated medicine name search — searches inventory on each keystroke
+  const handleMedNameInput = useCallback((val) => {
+    setMedNameSearch(val);
+    setInputMedName(val);
+    clearTimeout(medNameDebounceRef.current);
+    if (!val.trim()) { setMedNameResults([]); setShowMedNameDropdown(false); return; }
+    medNameDebounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/drugs?search=${encodeURIComponent(val)}`);
+        setMedNameResults(data);
+        setShowMedNameDropdown(data.length > 0);
+      } catch { setMedNameResults([]); setShowMedNameDropdown(false); }
+    }, 250);
+  }, []);
 
-  const selectDrugFromLookup = (drug) => {
+  // Select a drug from the Medicine Name dropdown — auto-fills dosage/days/price from inventory defaults
+  const selectMedFromDropdown = (drug) => {
     setInputMedName(drug.name);
+    setMedNameSearch(drug.name);
     setInputPrice(drug.selling_price.toString());
     setSelectedDrugId(drug.id);
-    setDrugSearchResults([]);
-    setDrugSearch('');
+    // Auto-fill from drug's saved defaults (fallback to 1 TDS 3 if not set)
+    setInputDoseQty(drug.default_dose_qty || '1');
+    setInputDoseFreq(drug.default_dose_freq || 'TDS');
+    setInputDuration((drug.default_duration_days || 3).toString());
+    setMedNameResults([]);
+    setShowMedNameDropdown(false);
   };
 
-  const addPrescribedDrug = () => {
+  // Close med name dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => { if (medNameRef.current && !medNameRef.current.contains(e.target)) setShowMedNameDropdown(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const addPrescribedDrug = (isOutside = false) => {
     if (!inputMedName.trim()) return;
 
     const count = parseInt(inputDuration) || 1;
@@ -491,15 +508,18 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
       medicine_name: inputMedName,
       dosage: combinedDosage,
       duration_days: parseInt(inputDuration) || 1,
-      price: totalItemPrice
+      price: totalItemPrice,
+      is_outside: isOutside
     };
 
     setPrescribedDrugs([...prescribedDrugs, newDrug]);
 
     // Clear inputs
     setInputMedName('');
+    setMedNameSearch('');
     setInputPrice('0');
     setSelectedDrugId(null);
+    setShowMedNameDropdown(false);
   };
 
   const removePrescribedDrug = (index) => {
@@ -536,6 +556,11 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     setNextVisitDate('');
     setNextVisitPlan('');
     setPrescribedDrugs([]);
+    setInputMedName('');
+    setMedNameSearch('');
+    setInputPrice('0');
+    setSelectedDrugId(null);
+    setShowMedNameDropdown(false);
     clearLabsForm();
   };
 
@@ -1328,106 +1353,69 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           <section className="right-scroll-container">
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0 }}>
 
-
-              {/* Search Inventory & Autofill Row */}
-              <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <input
-                    type="text"
-                    placeholder="Search inventory drugs..."
-                    value={drugSearch}
-                    onChange={(e) => handleDrugSearch(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '11px 42px 11px 16px',
-                      fontSize: '1rem',
-                      borderRadius: '10px',
-                      border: '1.5px solid #d1d5db',
-                      background: '#ffffff',
-                      color: '#111827',
-                      outline: 'none',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                      transition: 'border-color 0.2s, box-shadow 0.2s',
-                      boxSizing: 'border-box',
-                    }}
-                    onFocus={e => {
-                      e.target.style.borderColor = '#6366f1';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)';
-                    }}
-                    onBlur={e => {
-                      e.target.style.borderColor = '#d1d5db';
-                      e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
-                    }}
-                  />
-                  <Search size={17} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
-                </div>
-
-                {/* Drug Search dropdown list */}
-                {drugSearchResults.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '50px',
-                    left: 0,
-                    right: 0,
-                    background: '#ffffff',
-                    border: '1.5px solid #e5e7eb',
-                    borderRadius: '10px',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    zIndex: 20,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  }}>
-                    {drugSearchResults.map(drug => (
-                      <div
-                        key={drug.id}
-                        onClick={() => selectDrugFromLookup(drug)}
-                        style={{
-                          padding: '10px 16px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f3f4f6',
-                          fontSize: '0.88rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          color: '#111827',
-                          transition: 'background 0.15s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
-                      >
-                        <span><strong>{drug.name}</strong> <span style={{ color: '#6b7280', fontWeight: 400 }}>({drug.type})</span></span>
-                        <span style={{
-                          fontSize: '0.8rem',
-                          fontWeight: '600',
-                          color: drug.stock < drug.notify_threshold ? '#ef4444' : '#10b981',
-                          background: drug.stock < drug.notify_threshold ? '#fef2f2' : '#ecfdf5',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                        }}>
-                          Stock: {drug.stock} | {drug.selling_price} LKR
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Drug Add row */}
+              {/* Quick Drug Add row — Medicine Name has integrated inventory search */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1.6fr 0.9fr 1fr 44px',
+                gridTemplateColumns: '2fr 1.6fr 0.9fr 1fr 90px',
                 gap: '8px',
                 background: 'rgba(0,0,0,0.1)',
                 padding: '14px',
                 borderRadius: '8px',
                 border: '1px solid var(--glass-border)'
               }}>
-                <div>
+                {/* Medicine Name with inline inventory autocomplete */}
+                <div ref={medNameRef} style={{ position: 'relative' }}>
                   <label className="label-glass" style={{ fontSize: '0.9rem' }}>Medicine Name</label>
-                  <input type="text" className="input-glass" placeholder="Amoxil, Panadol" value={inputMedName} onChange={(e) => setInputMedName(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
+                  <input
+                    type="text"
+                    className="input-glass"
+                    placeholder="Search or type medicine..."
+                    value={medNameSearch}
+                    onChange={(e) => handleMedNameInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setShowMedNameDropdown(false); }}
+                    style={{ padding: '10px 12px', fontSize: '1rem' }}
+                    autoComplete="off"
+                  />
+                  {/* Inventory suggestions dropdown */}
+                  {showMedNameDropdown && medNameResults.length > 0 && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0,
+                      background: '#ffffff', border: '1.5px solid #e5e7eb',
+                      borderRadius: '10px', maxHeight: '220px', overflowY: 'auto',
+                      zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                      marginTop: '2px'
+                    }}>
+                      {medNameResults.map(drug => (
+                        <div
+                          key={drug.id}
+                          onMouseDown={() => selectMedFromDropdown(drug)}
+                          style={{
+                            padding: '9px 14px', cursor: 'pointer',
+                            borderBottom: '1px solid #f3f4f6', fontSize: '0.88rem',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            color: '#111827', transition: 'background 0.12s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+                        >
+                          <span>
+                            <strong style={{ color: '#1e40af' }}>{drug.name}</strong>
+                            <span style={{ color: '#6b7280', fontWeight: 400, marginLeft: '6px' }}>({drug.type})</span>
+                          </span>
+                          <span style={{
+                            fontSize: '0.78rem', fontWeight: '600',
+                            color: drug.stock < drug.notify_threshold ? '#ef4444' : '#10b981',
+                            background: drug.stock < drug.notify_threshold ? '#fef2f2' : '#ecfdf5',
+                            padding: '2px 8px', borderRadius: '6px'
+                          }}>
+                            Stock: {drug.stock}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <label className="label-glass" style={{ fontSize: '0.9rem' }}>Dosage</label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '4px' }}>
@@ -1455,57 +1443,105 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                     </select>
                   </div>
                 </div>
+
                 <div>
                   <label className="label-glass" style={{ fontSize: '0.9rem' }}>Day(s)</label>
                   <input type="number" className="input-glass" placeholder="Days" value={inputDuration} onChange={(e) => setInputDuration(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
                 </div>
+
                 <div>
                   <label className="label-glass" style={{ fontSize: '0.9rem' }}>Price/tab</label>
                   <input type="number" className="input-glass" placeholder="Price" value={inputPrice} onChange={(e) => setInputPrice(e.target.value)} style={{ padding: '10px 12px', fontSize: '1rem' }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <button className="btn btn-primary" onClick={addPrescribedDrug} style={{ padding: '10px', width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add to Prescription">
-                    <Plus size={18} />
-                  </button>
+
+                {/* Two add buttons: blue = inside (inventory), red = outside (external) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'flex-end' }}>
+                  <label className="label-glass" style={{ fontSize: '0.75rem', textAlign: 'center', opacity: 0.7 }}>Add</label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      onClick={() => addPrescribedDrug(false)}
+                      title="Add as Inside Medicine (from inventory)"
+                      style={{
+                        flex: 1, height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'linear-gradient(135deg, #0077e6, #0099ff)',
+                        border: 'none', borderRadius: '8px', cursor: 'pointer',
+                        color: '#fff', boxShadow: '0 2px 8px rgba(0,119,230,0.35)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Plus size={18} />
+                    </button>
+                    <button
+                      onClick={() => addPrescribedDrug(true)}
+                      title="Add as Outside Medicine (external)"
+                      style={{
+                        flex: 1, height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                        border: 'none', borderRadius: '8px', cursor: 'pointer',
+                        color: '#fff', boxShadow: '0 2px 8px rgba(220,38,38,0.35)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Prescribed Items Table */}
+              {/* Prescribed Items — single table; outside medicines marked with red OS prefix */}
               <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: '8px', background: 'rgba(0,0,0,0.15)', minHeight: '150px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)' }}>
-                      <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-secondary)' }}>Medicine</th>
-                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Dosage</th>
-                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)' }}>Days</th>
-                      <th style={{ textAlign: 'right', padding: '12px 16px', color: 'var(--text-secondary)' }}>Total Price</th>
-                      <th style={{ textAlign: 'center', padding: '12px 16px', color: 'var(--text-secondary)', width: '60px' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {prescribedDrugs.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                          No medicines appended to prescription list.
-                        </td>
+                {prescribedDrugs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                    No medicines appended to prescription list.
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--glass-border)' }}>
+                        <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Medicine</th>
+                        <th style={{ textAlign: 'center', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Dosage</th>
+                        <th style={{ textAlign: 'center', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Days</th>
+                        <th style={{ textAlign: 'right', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Total Price</th>
+                        <th style={{ textAlign: 'center', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem', width: '50px' }}>Del</th>
                       </tr>
-                    ) : (
-                      prescribedDrugs.map((item, index) => (
+                    </thead>
+                    <tbody>
+                      {prescribedDrugs.map((item, index) => (
                         <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '10px 14px', fontWeight: '500' }}>{item.medicine_name}</td>
-                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.dosage}</td>
-                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>{item.duration_days}</td>
-                          <td style={{ padding: '10px 14px', textAlign: 'right', color: 'var(--color-secondary)' }}>{item.price.toFixed(2)} LKR</td>
-                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <td style={{ padding: '9px 14px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            {item.is_outside && (
+                              <span style={{
+                                display: 'inline-block',
+                                fontSize: '0.68rem', fontWeight: '800',
+                                color: '#dc2626',
+                                border: '1.5px solid #dc2626',
+                                borderRadius: '4px',
+                                padding: '1px 5px',
+                                marginRight: '7px',
+                                letterSpacing: '0.5px',
+                                verticalAlign: 'middle',
+                                lineHeight: '1.4'
+                              }}>OS</span>
+                            )}
+                            {item.medicine_name}
+                          </td>
+                          <td style={{ padding: '9px 14px', textAlign: 'center', color: 'var(--color-secondary)', fontWeight: '600' }}>
+                            {(() => { const p = (item.dosage || '').trim().split(/\s+/); return p.length >= 2 ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '30px' }}><span>{p[0]}</span><span>{p.slice(1).join(' ')}</span></span> : item.dosage; })()}
+                          </td>
+                          <td style={{ padding: '9px 14px', textAlign: 'center' }}>{item.duration_days}</td>
+                          <td style={{ padding: '9px 14px', textAlign: 'right', color: item.is_outside ? 'var(--text-muted)' : 'var(--color-secondary)' }}>
+                            {item.is_outside ? '-' : `${(item.price || 0).toFixed(2)} LKR`}
+                          </td>
+                          <td style={{ padding: '9px 14px', textAlign: 'center' }}>
                             <button onClick={() => removePrescribedDrug(index)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer' }}>
-                              <Trash2 size={15} />
+                              <Trash2 size={14} />
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
 

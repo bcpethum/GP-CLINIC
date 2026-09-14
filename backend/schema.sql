@@ -244,3 +244,12 @@ UPDATE patients     SET doctor_id = (SELECT id FROM users WHERE role = 'doctor' 
 UPDATE visits       SET doctor_id = (SELECT id FROM users WHERE role = 'doctor' ORDER BY created_at ASC LIMIT 1) WHERE doctor_id IS NULL;
 UPDATE drugs        SET doctor_id = (SELECT id FROM users WHERE role = 'doctor' ORDER BY created_at ASC LIMIT 1) WHERE doctor_id IS NULL;
 UPDATE expenditures SET doctor_id = (SELECT id FROM users WHERE role = 'doctor' ORDER BY created_at ASC LIMIT 1) WHERE doctor_id IS NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PATCH: Add default dosage fields to drugs table
+-- These allow the doctor tab to auto-fill dosage when selecting from inventory.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS default_dose_qty  VARCHAR(10)  NOT NULL DEFAULT '1';
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS default_dose_freq VARCHAR(20)  NOT NULL DEFAULT 'TDS';
+ALTER TABLE drugs ADD COLUMN IF NOT EXISTS default_duration_days INTEGER  NOT NULL DEFAULT 3;
+

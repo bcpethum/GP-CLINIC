@@ -45,7 +45,11 @@ router.get('/', async (req, res) => {
 
 // 2. Add a new drug — tagged with doctor_id
 router.post('/', async (req, res) => {
-  const { name, type, expiry_date, selling_price, buying_price, notify_threshold, stock } = req.body;
+  const {
+    name, type, expiry_date, selling_price, buying_price,
+    notify_threshold, stock,
+    default_dose_qty, default_dose_freq, default_duration_days
+  } = req.body;
 
   if (!name || !type) {
     return res.status(400).json({ error: 'Name and type are required' });
@@ -54,8 +58,12 @@ router.post('/', async (req, res) => {
   try {
     const doctorId = await getDoctorId(req);
     const queryText = `
-      INSERT INTO drugs (name, type, expiry_date, selling_price, buying_price, notify_threshold, stock, doctor_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO drugs (
+        name, type, expiry_date, selling_price, buying_price,
+        notify_threshold, stock, doctor_id,
+        default_dose_qty, default_dose_freq, default_duration_days
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
     const result = await db.query(queryText, [
@@ -66,7 +74,10 @@ router.post('/', async (req, res) => {
       buying_price ? parseFloat(buying_price) : 0.00,
       notify_threshold ? parseInt(notify_threshold) : 10,
       stock ? parseInt(stock) : 0,
-      doctorId
+      doctorId,
+      default_dose_qty || '1',
+      default_dose_freq || 'TDS',
+      default_duration_days ? parseInt(default_duration_days) : 3
     ]);
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -78,7 +89,11 @@ router.post('/', async (req, res) => {
 // 3. Edit drug — scoped to doctor
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, type, expiry_date, selling_price, buying_price, notify_threshold, stock } = req.body;
+  const {
+    name, type, expiry_date, selling_price, buying_price,
+    notify_threshold, stock,
+    default_dose_qty, default_dose_freq, default_duration_days
+  } = req.body;
 
   try {
     const doctorId = await getDoctorId(req);
@@ -90,8 +105,11 @@ router.put('/:id', async (req, res) => {
           selling_price = $4,
           buying_price = $5,
           notify_threshold = $6,
-          stock = $7
-      WHERE id = $8 AND doctor_id = $9
+          stock = $7,
+          default_dose_qty = $8,
+          default_dose_freq = $9,
+          default_duration_days = $10
+      WHERE id = $11 AND doctor_id = $12
       RETURNING *
     `;
     const result = await db.query(queryText, [
@@ -102,6 +120,9 @@ router.put('/:id', async (req, res) => {
       buying_price ? parseFloat(buying_price) : 0.00,
       notify_threshold ? parseInt(notify_threshold) : 10,
       stock ? parseInt(stock) : 0,
+      default_dose_qty || '1',
+      default_dose_freq || 'TDS',
+      default_duration_days ? parseInt(default_duration_days) : 3,
       parseInt(id),
       doctorId
     ]);

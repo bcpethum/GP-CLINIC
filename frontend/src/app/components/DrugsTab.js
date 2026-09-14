@@ -19,6 +19,10 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
   const [buyingPrice, setBuyingPrice] = useState('');
   const [notifyThreshold, setNotifyThreshold] = useState('10');
   const [stock, setStock] = useState('');
+  // Default dosage fields
+  const [defaultDoseQty, setDefaultDoseQty] = useState('1');
+  const [defaultDoseFreq, setDefaultDoseFreq] = useState('TDS');
+  const [defaultDurationDays, setDefaultDurationDays] = useState('3');
 
   // Editing drug state
   const [editingId, setEditingId] = useState(null);
@@ -54,7 +58,10 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
       selling_price: parseFloat(sellingPrice) || 0.00,
       buying_price: parseFloat(buyingPrice) || 0.00,
       notify_threshold: parseInt(notifyThreshold) || 10,
-      stock: parseInt(stock) || 0
+      stock: parseInt(stock) || 0,
+      default_dose_qty: defaultDoseQty || '1',
+      default_dose_freq: defaultDoseFreq || 'TDS',
+      default_duration_days: parseInt(defaultDurationDays) || 3
     };
 
     try {
@@ -120,6 +127,9 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
     setBuyingPrice('');
     setNotifyThreshold('10');
     setStock('');
+    setDefaultDoseQty('1');
+    setDefaultDoseFreq('TDS');
+    setDefaultDurationDays('3');
   };
 
   // Categories defined in requirements & screenshots
@@ -213,45 +223,88 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
       {showAddForm && (
         <div className="glass-panel" style={{ marginBottom: '20px' }}>
           <h4 style={{ marginBottom: '14px', color: 'var(--color-secondary)' }}>Register New Drug Asset</h4>
-          <form onSubmit={handleAddDrug} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-            <div>
-              <label className="label-glass">Drug Name</label>
-              <input type="text" className="input-glass" placeholder="e.g. Paracetamol 500mg" value={name} onChange={(e) => setName(e.target.value)} required />
+          <form onSubmit={handleAddDrug} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Row 1: Drug info */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+              <div>
+                <label className="label-glass">Drug Name</label>
+                <input type="text" className="input-glass" placeholder="e.g. Paracetamol 500mg" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div>
+                <label className="label-glass">Type / Class</label>
+                <select className="input-glass" value={type} onChange={(e) => setType(e.target.value)} style={{ appearance: 'none' }}>
+                  <option value="Tablet">Tablet</option>
+                  <option value="Syrup">Syrup</option>
+                  <option value="Cream / LA">Cream / LA</option>
+                  <option value="Dropper">Dropper</option>
+                  <option value="Treatments & Other">Treatments & Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="label-glass">Expiry Date</label>
+                <input type="date" className="input-glass" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="label-glass">Initial Stock Qty</label>
+                <input type="number" className="input-glass" placeholder="e.g. 100" value={stock} onChange={(e) => setStock(e.target.value)} />
+              </div>
+              <div>
+                <label className="label-glass">Selling Price (LKR)</label>
+                <input type="number" step="0.01" className="input-glass" placeholder="e.g. 4.50" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} />
+              </div>
+              <div>
+                <label className="label-glass">Buying Price (LKR)</label>
+                <input type="number" step="0.01" className="input-glass" placeholder="e.g. 2.10" value={buyingPrice} onChange={(e) => setBuyingPrice(e.target.value)} />
+              </div>
+              <div>
+                <label className="label-glass">Low Stock Notify Limit</label>
+                <input type="number" className="input-glass" value={notifyThreshold} onChange={(e) => setNotifyThreshold(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label-glass">Type / Class</label>
-              <select className="input-glass" value={type} onChange={(e) => setType(e.target.value)} style={{ appearance: 'none' }}>
-                <option value="Tablet">Tablet</option>
-                <option value="Syrup">Syrup</option>
-                <option value="Cream / LA">Cream / LA</option>
-                <option value="Dropper">Dropper</option>
-                <option value="Treatments & Other">Treatments & Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="label-glass">Expiry Date</label>
-              <input type="date" className="input-glass" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-            </div>
-            <div>
-              <label className="label-glass">Initial Stock Qty</label>
-              <input type="number" className="input-glass" placeholder="e.g. 100" value={stock} onChange={(e) => setStock(e.target.value)} />
-            </div>
-            <div>
-              <label className="label-glass">Selling Price (LKR)</label>
-              <input type="number" step="0.01" className="input-glass" placeholder="e.g. 4.50" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} />
-            </div>
-            <div>
-              <label className="label-glass">Buying Price (LKR)</label>
-              <input type="number" step="0.01" className="input-glass" placeholder="e.g. 2.10" value={buyingPrice} onChange={(e) => setBuyingPrice(e.target.value)} />
-            </div>
-            <div>
-              <label className="label-glass">Low Stock Notify Limit</label>
-              <input type="number" className="input-glass" value={notifyThreshold} onChange={(e) => setNotifyThreshold(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button type="submit" className="btn btn-success" style={{ width: '100%' }}>
-                Save Asset
-              </button>
+
+            {/* Row 2: Default Dosage */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1.4fr',
+              gap: '14px', padding: '14px',
+              background: 'rgba(0,119,230,0.06)',
+              border: '1px solid rgba(0,119,230,0.18)',
+              borderRadius: '10px'
+            }}>
+              <div style={{ gridColumn: 'span 4', marginBottom: '-4px' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Default Dosage (auto-fills when selected in Doctor tab)
+                </span>
+              </div>
+              <div>
+                <label className="label-glass">Default Dose Qty</label>
+                <select className="input-glass" value={defaultDoseQty} onChange={(e) => setDefaultDoseQty(e.target.value)}>
+                  {['1/4','1/3','1/2','2/3','3/4','1','1.5','2','2.5','3','4','5','6'].map(q => (
+                    <option key={q} value={q}>{q}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label-glass">Default Dose Frequency</label>
+                <select className="input-glass" value={defaultDoseFreq} onChange={(e) => setDefaultDoseFreq(e.target.value)}>
+                  {['M','N','BD','TDS','QDS','SOS','EOD','STAT','VESP','NOON','2H','4H','6H','8H','WEEKLY'].map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label-glass">Default Days</label>
+                <input
+                  type="number" min="1" className="input-glass"
+                  placeholder="e.g. 5"
+                  value={defaultDurationDays}
+                  onChange={(e) => setDefaultDurationDays(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button type="submit" className="btn btn-success" style={{ width: '100%' }}>
+                  Save Asset
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -265,6 +318,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>Drug ID</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>Medicine Name</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>Category</th>
+              <th style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>Default Dosage</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>Expiry Date</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', textAlign: 'right' }}>S. Price</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', textAlign: 'right' }}>B. Price</th>
@@ -327,6 +381,19 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
                         padding: '4px 10px',
                         borderRadius: '12px'
                       }}>{drug.type}</span>
+                    </td>
+                    {/* Default Dosage column */}
+                    <td style={{ padding: '14px 20px' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '0.82rem', fontWeight: '700',
+                        color: 'var(--color-primary)',
+                        background: 'rgba(0,119,230,0.08)',
+                        border: '1px solid rgba(0,119,230,0.2)',
+                        padding: '3px 10px', borderRadius: '8px'
+                      }}>
+                        {drug.default_dose_qty || '1'} {drug.default_dose_freq || 'TDS'} × {drug.default_duration_days || 3}d
+                      </span>
                     </td>
                     <td style={{ padding: '14px 20px', color: isExpired ? 'var(--color-orange)' : 'var(--text-secondary)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
