@@ -122,6 +122,15 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   // Print document modal
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  // Confirm prescription modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmRemark, setConfirmRemark] = useState('');
+
+  // Success + SMS prompt modal
+  const [showSmsPrompt, setShowSmsPrompt] = useState(false);
+  const [smsPromptPhone, setSmsPromptPhone] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
+
   // Patients in queue
   const [queue, setQueue] = useState([]);
   const [activeVisit, setActiveVisit] = useState(null); // The visit currently open
@@ -564,18 +573,23 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     clearLabsForm();
   };
 
-  // Complete / Register & Complete Visit Logic
+  // Opens the confirmation modal
   const handleConfirmAndSend = async () => {
     if (!searchName || !searchTel) {
       await showAlert('Please select or fill out Name and Telephone number first.', 'Validation Error');
       return;
     }
+    setConfirmRemark('');
+    setShowConfirmModal(true);
+  };
 
+  // Actually finalizes the visit after modal confirmation
+  const handleDoConfirm = async () => {
+    setShowConfirmModal(false);
     try {
       let patientIdToUse = selectedPatient?.id;
       let visitIdToUse = activeVisit?.id;
 
-      // 1. If patient doesn't exist yet, register them on the fly
       if (!selectedPatient) {
         const calculatedAge = (parseInt(ageY) || 0) + (parseInt(ageM) || 0) / 12;
         const newPatient = await apiFetch('/patients', {
@@ -592,7 +606,6 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         setSelectedPatient(newPatient);
       }
 
-      // 2. If no active visit today exists, register a new visit row in database
       if (!visitIdToUse) {
         const newVisit = await apiFetch('/queue', {
           method: 'POST',
@@ -601,11 +614,12 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         visitIdToUse = newVisit.id;
       }
 
-      // 3. Complete the visit by submitting diagnostics
+      const combinedPlan = [nextVisitPlan, confirmRemark].filter(Boolean).join(' | ');
+
       const payload = {
         diagnosis,
         next_visit_date: nextVisitDate || null,
-        next_visit_plan: nextVisitPlan,
+        next_visit_plan: combinedPlan,
         total_fee: totalBill,
         paid_amount: totalBill,
         is_foc: isFoc,
@@ -621,10 +635,13 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         body: JSON.stringify(payload)
       });
 
-      await showAlert('Patient visit completed successfully!', 'Consultation Finalized');
       fetchQueue();
       fetchStats();
       if (patientIdToUse) fetchPatientHistory(patientIdToUse);
+
+      // Show success + SMS prompt
+      setSmsPromptPhone(searchTel || '');
+      setShowSmsPrompt(true);
 
     } catch (err) {
       console.error(err);
@@ -635,6 +652,28 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   const handlePrintPrescription = () => {
     // Open the print document selection modal
     setShowPrintModal(true);
+  };
+
+  const handleSendSmsAfterConfirm = async () => {
+    if (!smsPromptPhone) {
+      await showAlert('No phone number available for this patient.', 'SMS Error');
+      setShowSmsPrompt(false);
+      return;
+    }
+    setSmsSending(true);
+    try {
+      const message = `Dear ${searchName}, your prescription is ready. Bill: ${isFoc ? 'Free of Charge' : `Rs. ${totalBill.toFixed(0)}`}. Thank you for visiting us.`;
+      await apiFetch('/sms/send', {
+        method: 'POST',
+        body: JSON.stringify({ contact: smsPromptPhone, message })
+      });
+      await showAlert('SMS sent successfully!', 'SMS Sent');
+    } catch (err) {
+      await showAlert(err.message || 'Failed to send SMS', 'SMS Error');
+    } finally {
+      setSmsSending(false);
+      setShowSmsPrompt(false);
+    }
   };
 
   // Print a historical visit's prescription directly
@@ -1827,6 +1866,205 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                 }}
               >
                 Ok
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Success + SMS Prompt Modal ── */}
+      {showSmsPrompt && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15,23,42,0.45)',
+          backdropFilter: 'blur(7px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '22px',
+            padding: '36px 32px 28px',
+            width: '100%',
+            maxWidth: '360px',
+            boxShadow: '0 28px 64px rgba(0,0,0,0.22)',
+            textAlign: 'center',
+            animation: 'pdmFadeIn 0.2s ease-out'
+          }}>
+            {/* Green check circle */}
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'rgba(16,185,129,0.12)',
+              border: '3px solid #10b981',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              fontSize: '2rem'
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13l4 4L19 7" stroke="#10b981" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* Title */}
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#00b4d8', marginBottom: '12px' }}>
+              Successful
+            </div>
+
+            {/* Info */}
+            <div style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.7, marginBottom: '18px' }}>
+              Patient updated successfully<br />
+              Bill Send to Assistant
+              <br /><br />
+              <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>Do You Want to Send SMS ?</strong>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '0 -32px 20px' }} />
+
+            {/* Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                onClick={handleSendSmsAfterConfirm}
+                disabled={smsSending}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#00b4d8',
+                  fontSize: '0.97rem',
+                  fontWeight: 700,
+                  cursor: smsSending ? 'not-allowed' : 'pointer',
+                  padding: '10px',
+                  fontFamily: 'inherit',
+                  opacity: smsSending ? 0.6 : 1,
+                  transition: 'opacity 0.15s'
+                }}
+              >
+                {smsSending ? 'Sending...' : 'Yes'}
+              </button>
+              <button
+                onClick={() => setShowSmsPrompt(false)}
+                disabled={smsSending}
+                style={{
+                  background: '#f1f5f9',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  color: '#334155',
+                  fontSize: '0.97rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: '10px',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.target.style.background = '#f1f5f9'}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Confirm Prescription Modal ── */}
+      {showConfirmModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowConfirmModal(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(15,23,42,0.5)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '20px',
+            padding: '28px 28px 22px',
+            width: '100%',
+            maxWidth: '380px',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+            animation: 'pdmFadeIn 0.18s ease-out'
+          }}>
+            {/* Title */}
+            <h3 style={{ margin: '0 0 14px', fontSize: '1.18rem', fontWeight: 800, color: '#e05c1a' }}>
+              Confirm Prescription
+            </h3>
+
+            {/* Total */}
+            <div style={{ fontSize: '0.95rem', color: '#334155', marginBottom: '14px' }}>
+              Total : <strong style={{ color: '#0f172a' }}>{isFoc ? 'FOC' : `${totalBill.toFixed(0)}`}</strong>
+            </div>
+
+            {/* Remark label */}
+            <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '7px', fontWeight: 500 }}>
+              Remark for assistant <span style={{ color: '#94a3b8' }}>(optional)</span>
+            </div>
+
+            {/* Remark textarea */}
+            <textarea
+              rows={4}
+              placeholder="Enter Your Remark here....."
+              value={confirmRemark}
+              onChange={(e) => setConfirmRemark(e.target.value)}
+              style={{
+                width: '100%',
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '10px 13px',
+                fontSize: '0.88rem',
+                color: '#1e293b',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                outline: 'none',
+                boxSizing: 'border-box',
+                marginBottom: '18px',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => e.target.style.borderColor = '#38bdf8'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+
+            {/* Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                onClick={handleDoConfirm}
+                style={{
+                  background: 'linear-gradient(135deg, #0077e6, #0099ff)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '11px',
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'opacity 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.opacity = '0.88'}
+                onMouseLeave={e => e.target.style.opacity = '1'}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '11px',
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.target.style.background = '#f1f5f9'}
+              >
+                ← Edit
               </button>
             </div>
           </div>

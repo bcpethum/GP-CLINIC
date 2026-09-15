@@ -404,6 +404,7 @@ router.get('/dispensing', authenticateToken, requirePermission('queue'), async (
     // Fetch completed visits for today that have at least one prescription
     const visitsRes = await db.query(`
       SELECT v.id, v.queue_number, v.diagnosis, v.total_fee, v.dispensed,
+             v.next_visit_plan,
              p.name, p.age, p.telephone, p.allergies
       FROM visits v
       JOIN patients p ON v.patient_id = p.id

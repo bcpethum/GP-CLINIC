@@ -648,6 +648,27 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
                               </tbody>
                             </table>
 
+                            {/* Doctor's remark for assistant */}
+                            {visit.next_visit_plan && (
+                              <div style={{
+                                background: 'rgba(245,158,11,0.08)',
+                                border: '1.5px solid rgba(245,158,11,0.35)',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                marginTop: '10px',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '8px',
+                                fontSize: '0.83rem',
+                              }}>
+                                <span style={{ fontSize: '1rem', flexShrink: 0 }}>📝</span>
+                                <div>
+                                  <div style={{ fontWeight: '700', color: '#b45309', marginBottom: '2px', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Doctor's Remark</div>
+                                  <div style={{ color: '#78350f', lineHeight: 1.45 }}>{visit.next_visit_plan}</div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Done button */}
                             {!isDone && (
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px', gap: '8px' }}>
