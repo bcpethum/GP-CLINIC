@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, ShieldAlert, Package, Calendar, Check } from 'lucide-react';
+import { Search, Plus, Trash2, ShieldAlert, Package, Calendar, Check, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
@@ -151,8 +151,8 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure drug pricing, alerts, and monitor stock levels</span>
           </div>
 
-          <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
-            <Plus size={16} /> {showAddForm ? 'Hide Form' : 'Add New Drug'}
+          <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+            <Plus size={16} /> Add New Drug
           </button>
         </div>
 
@@ -221,9 +221,40 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
 
       {/* New Drug Form */}
       {showAddForm && (
-        <div className="glass-panel" style={{ marginBottom: '20px' }}>
-          <h4 style={{ marginBottom: '14px', color: 'var(--color-secondary)' }}>Register New Drug Asset</h4>
-          <form onSubmit={handleAddDrug} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-drug-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddForm(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1100,
+            background: 'rgba(15, 23, 42, 0.62)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div className="glass-panel" style={{
+            width: '100%', maxWidth: '760px', maxHeight: '90vh', overflowY: 'auto',
+            background: '#ffffff', border: '1px solid #dbeafe',
+            boxShadow: '0 24px 70px rgba(15, 23, 42, 0.35)', padding: '24px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '18px' }}>
+              <div>
+                <h4 id="add-drug-title" style={{ margin: 0, color: '#0f172a', fontSize: '1.2rem' }}>Register New Drug</h4>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Add pricing, stock, expiry, and default dosage details.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                aria-label="Close add drug dialog"
+                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '7px', cursor: 'pointer', color: '#475569', display: 'flex' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddDrug} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Row 1: Drug info */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px' }}>
               <div>
@@ -263,8 +294,8 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
             </div>
 
             {/* Row 2: Default Dosage */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            <div className="add-drug-dosage-grid" style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gap: '14px', padding: '14px',
               background: 'rgba(0,119,230,0.06)',
               border: '1px solid rgba(0,119,230,0.18)',
@@ -275,7 +306,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
                   Default Dosage (auto-fills when selected in Doctor tab)
                 </span>
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <label className="label-glass">Default Dose Qty</label>
                 <select className="input-glass" value={defaultDoseQty} onChange={(e) => setDefaultDoseQty(e.target.value)}>
                   {['1/4','1/3','1/2','2/3','3/4','1','1.5','2','2.5','3','4','5','6'].map(q => (
@@ -283,7 +314,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
                   ))}
                 </select>
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <label className="label-glass">Default Dose Frequency</label>
                 <select className="input-glass" value={defaultDoseFreq} onChange={(e) => setDefaultDoseFreq(e.target.value)}>
                   {['M','N','BD','TDS','QDS','SOS','EOD','STAT','VESP','NOON','2H','4H','6H','8H','WEEKLY'].map(f => (
@@ -291,7 +322,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
                   ))}
                 </select>
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <label className="label-glass">Default Days</label>
                 <input
                   type="number" min="1" className="input-glass"
@@ -300,13 +331,20 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
                   onChange={(e) => setDefaultDurationDays(e.target.value)}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button type="submit" className="btn btn-success" style={{ width: '100%' }}>
-                  Save Asset
-                </button>
-              </div>
+            </div>
+            <div className="add-drug-actions" style={{
+              display: 'flex', justifyContent: 'flex-end', gap: '10px',
+              paddingTop: '2px'
+            }}>
+              <button type="button" className="btn add-drug-cancel" onClick={() => setShowAddForm(false)} style={{ minWidth: '120px', flex: '0 1 120px' }}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-success" style={{ minWidth: '140px', flex: '0 1 140px' }}>
+                Save Asset
+              </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 

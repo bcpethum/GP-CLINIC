@@ -137,6 +137,17 @@ body::before {
   transform: translateY(-1px);
 }
 
+.add-drug-cancel {
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.add-drug-cancel:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
 /* Glass Inputs */
 .input-glass {
   background: rgba(255, 255, 255, 0.85);
@@ -784,6 +795,20 @@ input:checked+.slider:before {
   /* The 5-column prescription row needs to wrap */
   .rx-add-row {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+
+  .add-drug-dosage-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .add-drug-actions {
+    justify-content: stretch !important;
+    padding-bottom: 4px;
+  }
+
+  .add-drug-actions button {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
   }
 }
 

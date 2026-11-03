@@ -180,7 +180,6 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
 
   // All Visits modal & expanded visit card state
   const [showAllVisitsModal, setShowAllVisitsModal] = useState(false);
-  const [expandedVisitId, setExpandedVisitId] = useState(null);
   const [modalExpandedVisitId, setModalExpandedVisitId] = useState(null);
 
   // History of active patient
@@ -1191,7 +1190,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                     <span style={{
                       fontSize: '0.7rem', background: 'var(--accent-blue-bg)', color: 'var(--color-secondary)',
                       padding: '2px 8px', borderRadius: '10px', fontWeight: '600'
-                    }}>{history.length} visit{history.length !== 1 ? 's' : ''}</span>
+                    }}>Latest visit</span>
                   )}
                   {showLastVisitDropdown ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                 </div>
@@ -1213,14 +1212,16 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               </div>
 
               {showLastVisitDropdown && (
-                <div style={{ marginTop: '12px', maxHeight: '480px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+                <div style={{ marginTop: '12px', maxHeight: 'min(70vh, 760px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px', alignItems: 'stretch' }}>
                   {history.length === 0 ? (
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', textAlign: 'center' }}>No previous visit records found.</div>
                   ) : (
-                    history.map((h, i) => {
-                      const isExpanded = i === 0 ? true : expandedVisitId === h.id;
+                    history.slice(0, 1).map((h, i) => {
+                      const isExpanded = true;
                       const visitDate = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                       const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                      const investigationEntries = Object.entries(h.investigation || {})
+                        .filter(([key, value]) => key !== 'id' && key !== 'patient_id' && key !== 'visit_id' && value !== null && value !== undefined && String(value).trim() !== '');
                       // Split dosage string "qty freq" -> qty part and freq part
                       const parseDosage = (dosageStr) => {
                         if (!dosageStr) return { qty: '-', freq: '-' };
@@ -1230,14 +1231,15 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                       };
                       return (
                         <div key={h.id} style={{
-                          background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.12)',
-                          border: i === 0 ? '1.5px solid rgba(0,153,255,0.28)' : '1px solid rgba(255,255,255,0.07)',
-                          borderRadius: '12px', fontSize: '0.85rem', overflow: 'hidden'
+                          background: i === 0 ? '#eff8ff' : (i % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                          border: i === 0 ? '1.5px solid #38bdf8' : '1px solid #cbd5e1',
+                          borderRadius: '12px', fontSize: '0.85rem', overflow: 'hidden',
+                          flex: '0 0 auto', minHeight: 0
                         }}>
 
                           {/* Visit header bar — date | separator | fee */}
                           <div style={{
-                            background: i === 0 ? 'linear-gradient(135deg, rgba(0,140,220,0.55), rgba(0,100,180,0.45))' : 'rgba(255,255,255,0.05)',
+                            background: i === 0 ? 'linear-gradient(135deg, #0284c7, #38bdf8)' : (i % 2 === 0 ? '#e0f2fe' : '#e2e8f0'),
                             padding: '10px 14px',
                             display: 'flex',
                             alignItems: 'center',
@@ -1247,45 +1249,51 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
                               <span style={{
                                 width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                                background: i === 0 ? '#0b583fff' : '#64748b',
+                                background: i === 0 ? '#bbf7d0' : '#64748b',
                                 boxShadow: i === 0 ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none'
                               }} />
                               <strong style={{ color: i === 0 ? '#fff' : 'var(--text-primary)', fontSize: '0.92rem', letterSpacing: '0.3px' }}>
                                 {visitDate}
                               </strong>
-                              <span style={{ color: i === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', fontSize: '1rem' }}>|</span>
+                              <span style={{ color: i === 0 ? 'rgba(255,255,255,0.65)' : '#94a3b8', fontSize: '1rem' }}>|</span>
                               <span style={{
                                 fontSize: '0.8rem',
-                                color: i === 0 ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)',
+                                color: i === 0 ? '#ffffff' : '#334155',
                                 fontWeight: '600'
                               }}>
                                 Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}
                               </span>
                               {i === 0 && (
                                 <span style={{
-                                  fontSize: '0.65rem', background: 'rgba(16,185,129,0.25)', color: '#063525ff',
+                                  fontSize: '0.65rem', background: '#bbf7d0', color: '#166534',
                                   padding: '2px 7px', borderRadius: '8px', fontWeight: '700', letterSpacing: '0.5px',
                                   border: '1px solid rgba(1, 29, 20, 0.4)'
                                 }}>LAST VISIT</span>
                               )}
                             </div>
-                            {/* Expand/collapse toggle for older visits */}
-                            {i > 0 && (
-                              <button
-                                onClick={() => setExpandedVisitId(expandedVisitId === h.id ? null : h.id)}
-                                style={{
-                                  background: 'none', border: 'none', cursor: 'pointer',
-                                  color: 'var(--text-muted)', padding: '2px 4px', borderRadius: '4px'
-                                }}
-                              >
-                                {expandedVisitId === h.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                              </button>
-                            )}
                           </div>
 
                           {/* Body — only shown when expanded */}
                           {isExpanded && (
-                            <div style={{ padding: '10px 14px' }}>
+                            <div style={{ padding: '12px 14px', color: '#1e293b', minWidth: 0 }}>
+
+                              {/* Visit summary */}
+                              <div style={{
+                                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                                gap: '8px', marginBottom: '12px'
+                              }}>
+                                {[
+                                  ['Status', h.status || 'Completed', h.status === 'Completed' ? '#166534' : '#92400e', h.status === 'Completed' ? '#dcfce7' : '#fef3c7'],
+                                  ['Total fee', `Rs. ${(parseFloat(h.total_fee) || 0).toFixed(0)}`, '#075985', '#e0f2fe'],
+                                  ['Paid', h.is_foc ? 'FOC' : `Rs. ${(parseFloat(h.paid_amount) || 0).toFixed(0)}`, '#166534', '#dcfce7'],
+                                  ['Queue no.', h.queue_number || '-', '#6b21a8', '#f3e8ff']
+                                ].map(([label, value, color, background]) => (
+                                  <div key={label} style={{ background, borderRadius: '8px', padding: '7px 9px' }}>
+                                    <div style={{ fontSize: '0.68rem', color, fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+                                    <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700, marginTop: '2px' }}>{value}</div>
+                                  </div>
+                                ))}
+                              </div>
 
                               {/* Diagnosis badge */}
                               <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'flex-start', gap: '8px', flexWrap: 'wrap' }}>
@@ -1311,7 +1319,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                                     </colgroup>
                                     <thead>
                                       <tr style={{ background: 'rgba(0,0,0,0.18)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                                        <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Medicine</th>
+                                        <th style={{ padding: '6px 10px', textAlign: 'left',                                         color: '#475569', fontStyle: 'italic', fontWeight: '700', fontSize: '0.75rem' }}>Medicine</th>
                                         <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Dos-</th>
                                         <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Tabs</th>
                                         <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Dur-</th>
@@ -1326,19 +1334,19 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                                             background: idx % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent'
                                           }}>
                                             <td style={{
-                                              padding: '7px 10px', color: 'var(--text-primary)', fontWeight: '500',
+                                              padding: '7px 10px', color: '#0f172a', fontWeight: '600',
                                               fontSize: '0.82rem', wordBreak: 'break-word', lineHeight: 1.3
                                             }}>{rx.medicine_name}</td>
                                             <td style={{
-                                              padding: '7px 6px', textAlign: 'center', color: 'var(--color-secondary)',
+                                              padding: '7px 6px', textAlign: 'center', color: '#0284c7',
                                               fontWeight: '600', fontSize: '0.82rem'
                                             }}>{freq}</td>
                                             <td style={{
-                                              padding: '7px 6px', textAlign: 'center', color: 'var(--text-primary)',
+                                              padding: '7px 6px', textAlign: 'center', color: '#1e293b',
                                               fontWeight: '600', fontSize: '0.82rem'
                                             }}>{qty}</td>
                                             <td style={{
-                                              padding: '7px 6px', textAlign: 'center', color: 'var(--text-secondary)',
+                                              padding: '7px 6px', textAlign: 'center', color: '#475569',
                                               fontWeight: '500', fontSize: '0.82rem'
                                             }}>{rx.duration_days}</td>
                                           </tr>
@@ -1350,7 +1358,30 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                               )}
 
                               {!hasMeds && (
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '8px' }}>No medicines prescribed.</div>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', marginBottom: '8px' }}>No medicines prescribed.</div>
+                              )}
+
+                              {/* Follow-up and clinical notes */}
+                              {(h.next_visit_date || h.next_visit_plan) && (
+                                <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px' }}>
+                                  <div style={{ color: '#c2410c', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '3px' }}>Follow-up plan</div>
+                                  {h.next_visit_date && <div style={{ color: '#7c2d12', fontSize: '0.8rem', fontWeight: 700 }}>Next visit: {new Date(h.next_visit_date).toLocaleDateString('en-GB')}</div>}
+                                  {h.next_visit_plan && <div style={{ color: '#7c2d12', fontSize: '0.8rem', marginTop: '2px', lineHeight: 1.4 }}>{h.next_visit_plan}</div>}
+                                </div>
+                              )}
+
+                              {/* Laboratory investigations */}
+                              {investigationEntries.length > 0 && (
+                                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px' }}>
+                                  <div style={{ color: '#166534', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Investigations</div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '5px 10px' }}>
+                                    {investigationEntries.map(([key, value]) => (
+                                      <div key={key} style={{ fontSize: '0.78rem', color: '#14532d' }}>
+                                        <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
 
                               {/* Action buttons */}
@@ -1847,14 +1878,14 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   onClick={() => { if (selectedPatient) fetchPatientHistory(selectedPatient.id); }}
-                  style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
+                  style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '8px', padding: '7px 9px', cursor: 'pointer', color: '#1d4ed8' }}
                   title="Refresh history"
                 >
                   <RefreshCw size={14} />
                 </button>
                 <button
                   onClick={() => setShowAllVisitsModal(false)}
-                  style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
+                  style={{ background: '#fff1f2', border: '1px solid #fda4af', borderRadius: '8px', padding: '7px 9px', cursor: 'pointer', color: '#be123c' }}
                 >
                   <X size={16} />
                 </button>
@@ -1862,7 +1893,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
             </div>
 
             {/* Modal Body - All visits list */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff' }}>
+            <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff', alignItems: 'stretch' }}>
               {history.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>No visit records found for this patient.</div>
               ) : (
@@ -1870,13 +1901,16 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                   const isExp = modalExpandedVisitId === h.id;
                   const visitDateStr = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                   const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                  const investigationEntries = Object.entries(h.investigation || {})
+                    .filter(([key, value]) => key !== 'id' && key !== 'patient_id' && key !== 'visit_id' && value !== null && value !== undefined && String(value).trim() !== '');
                   const config = getSavedPrescriptionConfig(user?.id);
                   const refNo = `${config.refPrefix || 'DW'}/${new Date(h.visit_date).getFullYear().toString().slice(2)}${String(new Date(h.visit_date).getMonth() + 1).padStart(2, '0')}${String(new Date(h.visit_date).getDate()).padStart(2, '0')}/${h.id}`;
                   return (
                     <div key={h.id} style={{
                       background: i === 0 ? '#f0f9ff' : '#f8fafc',
                       border: i === 0 ? '1px solid #bae6fd' : '1px solid #e2e8f0',
-                      borderRadius: '12px', overflow: 'hidden'
+                      borderRadius: '12px', overflow: 'hidden',
+                      flex: '0 0 auto', minHeight: 0
                     }}>
                       {/* Row header */}
                       <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1884,16 +1918,17 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <span style={{
                             fontSize: '1rem', fontWeight: '700',
-                            color: '#1e293b', background: '#e2e8f0',
+                            color: '#075985', background: '#dbeafe', border: '1px solid #bfdbfe',
                             padding: '5px 14px', borderRadius: '8px'
                           }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
                           {/* Row action buttons */}
                           <button
                             onClick={() => handlePrintHistoryVisit(h)}
                             style={{
-                              background: '#f1f5f9', border: '1px solid #cbd5e1',
+                              background: '#f8fafc', border: '1px solid #94a3b8',
                               borderRadius: '8px', padding: '8px 14px', cursor: 'pointer',
-                              color: '#475569', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.9rem'
+                              color: '#334155', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.9rem',
+                              boxShadow: '0 1px 2px rgba(15,23,42,0.08)'
                             }}
                             title="Print prescription for this visit"
                           >
@@ -1903,12 +1938,12 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                             onClick={() => { handleRepeatPrescription(h); setShowAllVisitsModal(false); }}
                             disabled={!hasMeds}
                             style={{
-                              background: hasMeds ? '#0ea5e9' : '#f1f5f9',
+                              background: hasMeds ? 'linear-gradient(135deg, #0284c7, #0ea5e9)' : '#e2e8f0',
                               border: `1px solid ${hasMeds ? '#0284c7' : '#e2e8f0'}`,
                               borderRadius: '8px', padding: '8px 16px', cursor: hasMeds ? 'pointer' : 'not-allowed',
-                              color: hasMeds ? '#ffffff' : '#94a3b8',
+                              color: hasMeds ? '#ffffff' : '#64748b',
                               fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px',
-                              opacity: hasMeds ? 1 : 0.6, fontWeight: '700'
+                              opacity: hasMeds ? 1 : 0.9, fontWeight: '700'
                             }}
                             title="Repeat this prescription for current visit"
                           >
@@ -1918,7 +1953,8 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                             onClick={() => setModalExpandedVisitId(isExp ? null : h.id)}
                             style={{
                               background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#475569', padding: '4px'
+                              color: '#0369a1', padding: '6px', borderRadius: '7px',
+                              background: '#e0f2fe', border: '1px solid #7dd3fc'
                             }}
                           >
                             {isExp ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -1928,7 +1964,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
 
                       {/* Expandable diagnosis + meds */}
                       {isExp && (
-                        <div style={{ padding: '0 22px 20px', borderTop: '1px solid #e2e8f0' }}>
+                        <div style={{ padding: '0 22px 20px', borderTop: '1px solid #e2e8f0', minWidth: 0 }}>
                           {/* Diagnosis pill/badge row */}
                           <div style={{
                             background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0',
@@ -1953,6 +1989,43 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                               )}
                             </div>
                           </div>
+
+                          <div style={{
+                            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                            gap: '8px', marginBottom: '16px'
+                          }}>
+                            {[
+                              ['Status', h.status || 'Completed', '#166534', '#dcfce7'],
+                              ['Paid', h.is_foc ? 'FOC' : `Rs. ${(parseFloat(h.paid_amount) || 0).toFixed(0)}`, '#075985', '#e0f2fe'],
+                              ['Queue no.', h.queue_number || '-', '#6b21a8', '#f3e8ff']
+                            ].map(([label, value, color, background]) => (
+                              <div key={label} style={{ background, borderRadius: '8px', padding: '8px 10px' }}>
+                                <div style={{ color, fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>{label}</div>
+                                <div style={{ color: '#0f172a', fontSize: '0.9rem', fontWeight: 700, marginTop: '2px' }}>{value}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {(h.next_visit_date || h.next_visit_plan) && (
+                            <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+                              <div style={{ color: '#c2410c', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>Follow-up plan</div>
+                              {h.next_visit_date && <div style={{ color: '#7c2d12', fontWeight: 700, marginTop: '3px' }}>Next visit: {new Date(h.next_visit_date).toLocaleDateString('en-GB')}</div>}
+                              {h.next_visit_plan && <div style={{ color: '#7c2d12', marginTop: '3px' }}>{h.next_visit_plan}</div>}
+                            </div>
+                          )}
+
+                          {investigationEntries.length > 0 && (
+                            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px' }}>
+                              <div style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px' }}>Investigations</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '5px 12px' }}>
+                                {investigationEntries.map(([key, value]) => (
+                                  <div key={key} style={{ color: '#14532d', fontSize: '0.85rem' }}>
+                                    <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Medicine table */}
                           {hasMeds ? (
@@ -1994,7 +2067,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                 onClick={() => setShowAllVisitsModal(false)}
                 style={{
                   padding: '8px 32px', fontSize: '0.95rem', fontWeight: '600',
-                  background: '#0ea5e9', color: '#ffffff', border: 'none',
+                  background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', color: '#ffffff', border: 'none',
                   borderRadius: '8px', cursor: 'pointer'
                 }}
               >
