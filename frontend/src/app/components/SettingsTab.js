@@ -179,7 +179,7 @@ function AssistantRow({
       {/* Expanded management panel */}
       {isExpanded && (
         <div style={{ padding: '16px 18px', borderTop: '1px solid rgba(0, 100, 200, 0.12)', animation: 'fadeIn 0.2s ease', background: '#f8fafc' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '24px' }}>
             {/* Permissions column */}
             <div>
               <h4 style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -411,7 +411,7 @@ function AssistantManagement({ showAlert, showConfirm }) {
         <div className="glass-panel" style={{ animation: 'fadeIn 0.2s ease', background: '#ffffff', border: '1px solid var(--glass-border)', boxShadow: '0 8px 24px rgba(0, 80, 180, 0.08)' }}>
           <h4 style={{ fontSize: '1rem', marginBottom: '16px', color: 'var(--color-primary)', fontWeight: '700' }}>New Assistant Account</h4>
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
               <div>
                 <label className="label-glass">Full Name</label>
                 <input type="text" className="input-glass" placeholder="Assistant Name" value={newName} onChange={e => setNewName(e.target.value)} required />
@@ -573,13 +573,28 @@ function PrescriptionDesignSection({ showAlert }) {
       planOfAction: 'Review in 5 days if fever persists.'
     });
 
-    const printWin = window.open('', '_blank');
-    printWin.document.write(html);
-    printWin.document.close();
+    // Print preview using hidden iframe (stays in current tab)
+    const printIframe = document.createElement('iframe');
+    printIframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(printIframe);
+    const iDoc = printIframe.contentDocument || printIframe.contentWindow.document;
+    iDoc.open(); iDoc.write(html); iDoc.close();
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      printIframe.contentWindow.focus();
+      printIframe.contentWindow.print();
+      setTimeout(() => { try { document.body.removeChild(printIframe); } catch(e){} }, 1500);
+    };
+    printIframe.contentWindow.onload = doPrint;
+    setTimeout(doPrint, 400);
+    // printWin.document.write(html); // replaced by iframe
+    // printWin.document.close(); // replaced by iframe
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'flex-start' }}>
+    <div className="prescription-designer-grid">
 
       {/* LEFT COLUMN: Controls & Uploads */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -765,7 +780,7 @@ function PrescriptionDesignSection({ showAlert }) {
                   placeholder="Dr. (Name)"
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
                 <div>
                   <label className="label-glass">Doctor Qualifications</label>
                   <input
@@ -1203,7 +1218,8 @@ export default function SettingsTab({ API_BASE, showAlert, showConfirm, user }) 
           borderRadius: '10px',
           padding: '4px',
           border: '1px solid var(--glass-border)',
-          gap: '4px'
+          gap: '4px',
+          flexWrap: 'wrap'
         }}>
           <button
             type="button"
@@ -1300,7 +1316,7 @@ export default function SettingsTab({ API_BASE, showAlert, showConfirm, user }) 
           </div>
 
           <form onSubmit={handleSaveClinicSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
               <div>
                 <label className="label-glass">Clinic Name</label>
                 <input

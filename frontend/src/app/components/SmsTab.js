@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircle, XCircle, RefreshCw,
   Play, Square, ChevronLeft,
-  Loader, Phone, ChevronDown,
+  Loader, Phone, ChevronDown, Plus, ExternalLink,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
@@ -57,6 +57,11 @@ export default function SmsTab({ API_BASE, showAlert }) {
   /* ── Account Status ── */
   const [accountStatus, setAccountStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('5000');
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupOrder, setTopupOrder] = useState(null);
+  const [paymentChecking, setPaymentChecking] = useState(false);
 
   /* ── Source selector: which mode drives the table ──
      mode = 'next-visit' | 'active'
@@ -96,6 +101,57 @@ export default function SmsTab({ API_BASE, showAlert }) {
       setStatusLoading(false);
     }
   }, []);
+
+  const createTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount < 1000 || amount > 100000) {
+      showAlert('Enter a whole-number amount between 1,000 and 100,000 LKR.', 'Invalid Top Up');
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      const res = await apiFetch('/sms/reload-credit', {
+        method: 'POST',
+        body: JSON.stringify({ amount })
+      });
+      const payment = res?.data || res;
+      if (!payment.payment_url || !payment.order_id) {
+        throw new Error(res.message || 'SMS provider did not return a payment link.');
+      }
+      setTopupOrder({ orderId: payment.order_id, paymentUrl: payment.payment_url, amount });
+      window.open(payment.payment_url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      showAlert(err.message || 'Could not create top-up payment.', 'Top Up Error');
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
+  const checkTopupPayment = async () => {
+    if (!topupOrder?.orderId) return;
+    setPaymentChecking(true);
+    try {
+      const res = await apiFetch('/sms/payment-status', {
+        method: 'POST',
+        body: JSON.stringify({ order_id: topupOrder.orderId })
+      });
+      const status = res?.data?.status || res?.status;
+      if (status === 'paid') {
+        setShowTopup(false);
+        setTopupOrder(null);
+        await checkAccountStatus();
+        showAlert('Top up completed and your SMS balance has been refreshed.', 'Top Up Successful');
+      } else if (status === 'expired') {
+        showAlert('This payment link has expired. Please create a new top up.', 'Payment Expired');
+      } else {
+        showAlert(`Payment status: ${status || 'pending'}. Complete payment, then check again.`, 'Payment Pending');
+      }
+    } catch (err) {
+      showAlert(err.message || 'Could not check payment status.', 'Payment Status Error');
+    } finally {
+      setPaymentChecking(false);
+    }
+  };
   useEffect(() => { checkAccountStatus(); }, []);
 
   const loadData = useCallback(async () => {
@@ -240,7 +296,7 @@ export default function SmsTab({ API_BASE, showAlert }) {
 
   /* ─────────────────────── Render ─────────────────────── */
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '0', minHeight: 'calc(100vh - 70px)', background: 'var(--bg-primary)' }}>
+    <div className="sms-layout">
       <style>{`
         .sms-inp { width:100%; background:var(--bg-secondary); border:1px solid var(--glass-border); border-radius:8px; padding:8px 12px; color:var(--text-primary); font-family:inherit; font-size:0.88rem; outline:none; box-sizing:border-box; }
         .sms-inp:focus { border-color:var(--color-secondary); }
@@ -287,6 +343,13 @@ export default function SmsTab({ API_BASE, showAlert }) {
           </div>
           <button className="sms-btn sms-btn-outline" style={{ width: '100%', justifyContent: 'center', padding: '8px' }} onClick={checkAccountStatus} disabled={statusLoading}>
             {statusLoading ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> Checking...</> : <><CheckCircle size={13} /> Check Balance</>}
+          </button>
+          <button
+            className="sms-btn"
+            style={{ width: '100%', justifyContent: 'center', padding: '8px', marginTop: '8px', background: 'linear-gradient(135deg, #0284c7, #06b6d4)', color: '#fff', border: 'none' }}
+            onClick={() => { setTopupOrder(null); setShowTopup(true); }}
+          >
+            <Plus size={14} /> Top Up SMS Credits
           </button>
         </div>
 
@@ -381,6 +444,58 @@ export default function SmsTab({ API_BASE, showAlert }) {
           </button>
         </div>
       </div>
+
+      {showTopup && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget && !topupLoading && !paymentChecking) setShowTopup(false); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        >
+          <div style={{ width: '100%', maxWidth: '440px', background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 24px 70px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '1.2rem' }}>Top Up SMS Credits</h3>
+            <p style={{ margin: '0 0 18px', color: '#64748b', fontSize: '0.86rem', lineHeight: 1.5 }}>
+              Choose an amount in LKR. You will be redirected to SMS Lenz secure card checkout.
+            </p>
+            {!topupOrder ? (
+              <>
+                <label style={{ display: 'block', marginBottom: '6px', color: '#334155', fontSize: '0.85rem', fontWeight: 600 }}>
+                  Amount (LKR)
+                </label>
+                <input
+                  type="number"
+                  min="1000"
+                  max="100000"
+                  step="1000"
+                  value={topupAmount}
+                  onChange={e => setTopupAmount(e.target.value)}
+                  className="sms-inp"
+                  style={{ width: '100%', marginBottom: '16px' }}
+                />
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="sms-btn sms-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowTopup(false)} disabled={topupLoading}>Cancel</button>
+                  <button className="sms-btn" style={{ flex: 1, justifyContent: 'center', background: '#0284c7', color: '#fff', border: 'none' }} onClick={createTopup} disabled={topupLoading}>
+                    {topupLoading ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Creating...</> : <><ExternalLink size={14} /> Continue to Payment</>}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ padding: '12px', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.86rem', lineHeight: 1.5, marginBottom: '16px' }}>
+                  Payment link created for <strong>{topupOrder.amount.toLocaleString()} LKR</strong>. Complete payment in the SMS Lenz checkout window.
+                </div>
+                <button className="sms-btn sms-btn-outline" style={{ width: '100%', justifyContent: 'center', marginBottom: '10px' }} onClick={() => window.open(topupOrder.paymentUrl, '_blank', 'noopener,noreferrer')}>
+                  <ExternalLink size={14} /> Reopen Payment Page
+                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="sms-btn sms-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowTopup(false)} disabled={paymentChecking}>Close</button>
+                  <button className="sms-btn" style={{ flex: 1, justifyContent: 'center', background: '#0284c7', color: '#fff', border: 'none' }} onClick={checkTopupPayment} disabled={paymentChecking}>
+                    {paymentChecking ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Checking...</> : <><RefreshCw size={14} /> Check Payment</>}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══ RIGHT PANEL ══ */}
       <div style={{ padding: '24px 28px', overflowY: 'auto' }}>

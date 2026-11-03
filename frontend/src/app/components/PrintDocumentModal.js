@@ -274,6 +274,8 @@ export default function PrintDocumentModal({
         fromDate,
         toDate,
         signsSymptoms,
+        removeHeader,
+        removeFooter,
       });
     } else if (selectedDoc === 'medical_bill') {
       htmlContent = buildMedicalBillHtml({
@@ -290,6 +292,8 @@ export default function PrintDocumentModal({
         includeNextVisit,
         includePastHistory,
         remarks,
+        removeHeader,
+        removeFooter,
       });
     } else if (selectedDoc === 'medical_report') {
       htmlContent = buildMedicalReportHtml({
@@ -303,6 +307,8 @@ export default function PrintDocumentModal({
         referralNote: remarks,
         investigations,
         includePastHistory,
+        removeHeader,
+        removeFooter,
       });
     } else if (selectedDoc === 'referral') {
       htmlContent = buildReferralLetterHtml({
@@ -314,6 +320,8 @@ export default function PrintDocumentModal({
         diagnosis,
         referralNote,
         referralType: referralType || 'Referral',
+        removeHeader,
+        removeFooter,
       });
     } else if (selectedDoc === 'custom_document') {
       htmlContent = buildCustomDocumentHtml({
@@ -322,13 +330,34 @@ export default function PrintDocumentModal({
         visitDate,
         queueNumber,
         customContent,
+        removeHeader,
+        removeFooter,
       });
     }
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
+    // Use hidden iframe to print in current tab (no new tab opens)
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+    // Guard flag — ensures print() is triggered exactly once
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 1500);
+    };
+    iframe.contentWindow.onload = doPrint;
+    // Fallback in case onload already fired before we attached the handler
+    setTimeout(doPrint, 400);
+    if (false) { /* stale printWindow block removed */
+      printWindow.document.write(htmlContent); /* stale — no-op */
+      printWindow.document.close(); // removed
     }
   };
 
@@ -346,15 +375,15 @@ export default function PrintDocumentModal({
       }
       htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, nextVisitDate, includePastHistory, pastHistory: history, removeHeader, removeFooter, rxInside, rxOutside });
     } else if (selectedDoc === 'medical_certificate') {
-      htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms });
+      htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms, removeHeader, removeFooter });
     } else if (selectedDoc === 'medical_bill') {
-      htmlContent = buildMedicalBillHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, prescriptions, consultationFee, totalBill, isFoc, detailedBill, includeNextVisit, includePastHistory, remarks });
+      htmlContent = buildMedicalBillHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, prescriptions, consultationFee, totalBill, isFoc, detailedBill, includeNextVisit, includePastHistory, remarks, removeHeader, removeFooter });
     } else if (selectedDoc === 'medical_report') {
-      htmlContent = buildMedicalReportHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, prescriptions, referralNote: remarks, investigations, includePastHistory });
+      htmlContent = buildMedicalReportHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, prescriptions, referralNote: remarks, investigations, includePastHistory, removeHeader, removeFooter });
     } else if (selectedDoc === 'referral') {
-      htmlContent = buildReferralLetterHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, referralNote, referralType: referralType || 'Referral' });
+      htmlContent = buildReferralLetterHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, referralNote, referralType: referralType || 'Referral', removeHeader, removeFooter });
     } else if (selectedDoc === 'custom_document') {
-      htmlContent = buildCustomDocumentHtml({ config, patientName: patientName || 'Walk-in Patient', visitDate, queueNumber, customContent });
+      htmlContent = buildCustomDocumentHtml({ config, patientName: patientName || 'Walk-in Patient', visitDate, queueNumber, customContent, removeHeader, removeFooter });
     }
 
     if (!htmlContent) return;
@@ -416,15 +445,15 @@ export default function PrintDocumentModal({
         }
         htmlContent = buildPrescriptionHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, allergies: '', visitDate: consultDate, queueNumber, prescriptions, qrImageSrc, planOfAction: remarks || nextVisitPlan, includeNextVisit, nextVisitDate, includePastHistory, pastHistory: history, removeHeader, removeFooter, rxInside, rxOutside });
       } else if (selectedDoc === 'medical_certificate') {
-        htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms });
+        htmlContent = buildMedicalCertificateHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate: consultDate, queueNumber, diagnosis, referralNote: remarks, residenceType, residencePlace, fromDate, toDate, signsSymptoms, removeHeader, removeFooter });
       } else if (selectedDoc === 'medical_bill') {
-        htmlContent = buildMedicalBillHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, prescriptions, consultationFee, totalBill, isFoc, detailedBill, includeNextVisit, includePastHistory, remarks });
+        htmlContent = buildMedicalBillHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, prescriptions, consultationFee, totalBill, isFoc, detailedBill, includeNextVisit, includePastHistory, remarks, removeHeader, removeFooter });
       } else if (selectedDoc === 'medical_report') {
-        htmlContent = buildMedicalReportHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, prescriptions, referralNote: remarks, investigations, includePastHistory });
+        htmlContent = buildMedicalReportHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, prescriptions, referralNote: remarks, investigations, includePastHistory, removeHeader, removeFooter });
       } else if (selectedDoc === 'referral') {
-        htmlContent = buildReferralLetterHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, referralNote, referralType: referralType || 'Referral' });
+        htmlContent = buildReferralLetterHtml({ config, patientName: patientName || 'Walk-in Patient', ageText: ageFormatted, visitDate, queueNumber, diagnosis, referralNote, referralType: referralType || 'Referral', removeHeader, removeFooter });
       } else if (selectedDoc === 'custom_document') {
-        htmlContent = buildCustomDocumentHtml({ config, patientName: patientName || 'Walk-in Patient', visitDate, queueNumber, customContent });
+        htmlContent = buildCustomDocumentHtml({ config, patientName: patientName || 'Walk-in Patient', visitDate, queueNumber, customContent, removeHeader, removeFooter });
       }
 
       if (!htmlContent) {

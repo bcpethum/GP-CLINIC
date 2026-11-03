@@ -146,6 +146,9 @@ router.post('/', authenticateToken, requirePermission('queue'), async (req, res)
     `;
     const detailResult = await db.query(detailQuery, [newVisitResult.rows[0].id]);
 
+    // Notify connected doctor screens so newly registered patients appear immediately.
+    broadcastToDoctor(doctorId, 'queue:update', { visitId: detailResult.rows[0].id });
+
     res.status(201).json(detailResult.rows[0]);
   } catch (err) {
     console.error(err);
