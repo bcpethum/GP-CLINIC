@@ -421,7 +421,7 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
               </div>
 
               {/* Form Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
                 <div>
                   <label className="label-glass">Full Name</label>
                   <input type="text" className="input-glass" value={name} onChange={(e) => setName(e.target.value)} disabled={!editMode} />
@@ -506,7 +506,7 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
               </h3>
 
               {/* Upload Form */}
-              <form onSubmit={handleImageUpload} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr', gap: '12px', marginBottom: '20px', background: 'rgba(0,0,0,0.15)', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <form onSubmit={handleImageUpload} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px', background: 'rgba(0,0,0,0.15)', padding: '12px', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
                 <div>
                   <label className="label-glass" style={{ fontSize: '0.75rem' }}>Select Image File</label>
                   <input
@@ -539,7 +539,7 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
               {patientImages.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No diagnostic scans stored in database yet.</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
                   {patientImages.map(img => {
                     const fullUrl = (img.image_url && (img.image_url.startsWith('data:') || img.image_url.startsWith('http')))
                       ? img.image_url
@@ -646,7 +646,7 @@ export default function PatientsTab({ API_BASE, showAlert, showConfirm }) {
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No previous visits logged.</p>
                 ) : (
                   visitHistory.map(visit => (
-                    <div key={visit.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '14px', display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '15px' }}>
+                    <div key={visit.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '14px', display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 3fr', gap: '15px' }}>
                       <div style={{ borderRight: '1px solid var(--glass-border)', paddingRight: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
                           <Calendar size={14} style={{ color: 'var(--color-secondary)' }} />

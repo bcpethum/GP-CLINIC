@@ -90,8 +90,9 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   const silentRefresh = useCallback(async (date) => {
     try {
       const data = await apiFetch(`/queue/dispensing?date=${date || visitDateRef.current}`);
-      setDispensingList(data);
-      const first = data.find(v => !v.dispensed);
+      const pendingDispensing = data.filter(v => !v.dispensed);
+      setDispensingList(pendingDispensing);
+      const first = pendingDispensing[0];
       if (first) setExpandedVisitId(prev => prev ?? first.id);
     } catch (err) {
       console.error('Silent refresh error:', err.message);
@@ -103,8 +104,9 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
     setLoadingDispensing(true);
     try {
       const data = await apiFetch(`/queue/dispensing?date=${date || visitDateRef.current}`);
-      setDispensingList(data);
-      const first = data.find(v => !v.dispensed);
+      const pendingDispensing = data.filter(v => !v.dispensed);
+      setDispensingList(pendingDispensing);
+      const first = pendingDispensing[0];
       if (first) setExpandedVisitId(prev => prev ?? first.id);
     } catch (err) {
       console.error('Dispensing fetch error:', err.message);
@@ -117,10 +119,61 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
   const handleDone = async (visitId) => {
     try {
       await apiFetch(`/queue/${visitId}/dispensed`, { method: 'PUT' });
-      setDispensingList(prev => prev.map(v => v.id === visitId ? { ...v, dispensed: true } : v));
+      setDispensingList(prev => prev.filter(v => v.id !== visitId));
+      setExpandedVisitId(prev => prev === visitId ? null : prev);
     } catch (err) {
       console.error('Dispensed error:', err.message);
     }
+  };
+
+  const handlePrintDispensing = (visit) => {
+    const rows = (visit.prescriptions || []).map((rx, index) => {
+      const parts = (rx.dosage || '').split(/[-\s]+/);
+      const qty = parseFloat(parts[0]) || 1;
+      const freq = (parts[1] || 'TDS').toUpperCase();
+      const freqMap = { M: 1, N: 1, BD: 2, TDS: 3, QDS: 4, '8H': 3, '6H': 4, '4H': 6, EOD: 0.5, WEEKLY: 0.143, STAT: 1, SOS: 1, VESP: 1, NOON: 1 };
+      const totalQty = freq === 'STAT'
+        ? Math.ceil(qty)
+        : Math.ceil(qty * (freqMap[freq] ?? 3) * (rx.duration_days || 3));
+      return `<tr><td>${index + 1}</td><td>${rx.medicine_name || ''}</td><td>${freq}</td><td>${qty}</td><td>${rx.duration_days || ''}</td><td>${totalQty}</td></tr>`;
+    }).join('');
+    const html = `<!doctype html><html><head><title>Medicine Details - ${visit.name}</title>
+      <style>
+        @page { size: A4 portrait; margin: 18mm; }
+        body { font-family: Arial, sans-serif; color: #172033; }
+        h1 { color: #087fbd; margin-bottom: 4px; }
+        .meta { color: #475569; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #e0f2fe; color: #075985; text-align: left; }
+        th, td { padding: 10px; border-bottom: 1px solid #cbd5e1; }
+        .remark { margin-top: 20px; padding: 12px; background: #fff7ed; border: 1px solid #fed7aa; }
+      </style></head><body onload="window.print();window.close()">
+      <h1>Medicine Details</h1>
+      <div class="meta"><strong>Patient:</strong> ${visit.name || 'Patient'}${visit.age ? ` (${visit.age} years)` : ''}<br/>
+      <strong>Queue No:</strong> ${visit.queue_number || ''}<br/>
+      <strong>Bill:</strong> Rs. ${parseFloat(visit.total_fee || 0).toLocaleString()}</div>
+      ${visit.allergies ? `<p><strong>Allergies:</strong> ${visit.allergies}</p>` : ''}
+      <table><thead><tr><th>#</th><th>Medicine</th><th>Frequency</th><th>Qty</th><th>Days</th><th>Total Quantity</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      ${visit.next_visit_plan ? `<div class="remark"><strong>Doctor's Remark:</strong><br/>${visit.next_visit_plan}</div>` : ''}
+      </body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+    let printed = false;
+    const print = () => {
+      if (printed) return;
+      printed = true;
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch (e) { /* already removed */ } }, 1500);
+    };
+    iframe.contentWindow.onload = print;
+    setTimeout(print, 400);
   };
 
   // Helper: parse dosage string
@@ -361,10 +414,10 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
 
 
         {/* Two-column content area */}
-        <main className="doctor-content">
+        <main className="doctor-content assistant-content">
 
           {/* LEFT: Search + Patient Form */}
-          <section className="left-scroll-container">
+          <section className="left-scroll-container assistant-left-container">
 
             {/* Search Panel */}
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -436,7 +489,7 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
               </div>
 
               {/* Name + Telephone + QR */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(86px, 1fr)', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div>
                     <label className="label-glass" style={{ fontSize: '0.8rem' }}>Patient Name</label>
@@ -467,17 +520,17 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
               )}
 
               {/* Action buttons row 1 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.4fr 1fr', gap: '8px' }}>
-                <button className="btn btn-primary" style={{ fontSize: '0.9rem', padding: '10px 8px' }} onClick={handleUpdateAndSend}><Send size={15} /> Update &amp; Send</button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.9rem', padding: '10px 8px' }} onClick={handleUpdateOnly}><Check size={15} /> Update Only</button>
-                <button className="btn btn-danger" style={{ fontSize: '0.9rem', padding: '10px 8px' }} onClick={handleClear}>Clear</button>
+              <div className="assistant-action-grid">
+                <button className="btn btn-primary" onClick={handleUpdateAndSend}><Send size={15} /> Update &amp; Send</button>
+                <button className="btn btn-secondary" onClick={handleUpdateOnly}><Check size={15} /> Update Only</button>
+                <button className="btn btn-danger" onClick={handleClear}>Clear</button>
               </div>
 
               {/* Action buttons row 2 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <div className="assistant-action-grid">
                 <button
                   className="btn btn-secondary"
-                  style={{ color: 'var(--color-secondary)', fontSize: '0.85rem', padding: '9px 6px' }}
+                  style={{ color: 'var(--color-secondary)' }}
                   onClick={async () => patientId
                     ? await showAlert(`Records loaded for patient ID: ${patientId}`, 'Patient Records')
                     : await showAlert('No patient selected.', 'No Patient')}
@@ -489,7 +542,6 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
                 <button
                   className="btn btn-secondary"
                   style={{
-                    fontSize: '0.85rem', padding: '9px 6px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
                     border: hasOthersData ? '1px solid var(--color-secondary)' : undefined,
                     color: hasOthersData ? 'var(--color-secondary)' : undefined,
@@ -509,14 +561,14 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
                   )}
                 </button>
 
-                <button className="btn btn-secondary" style={{ fontSize: '0.85rem', padding: '9px 6px' }} onClick={handlePrintCard}><Printer size={14} /> Token</button>
+                <button className="btn btn-secondary" onClick={handlePrintCard}><Printer size={14} /> Token</button>
               </div>
             </div>
 
           </section>
 
           {/* RIGHT: Medicine Dispensing Panel */}
-          <section className="right-scroll-container">
+          <section className="right-scroll-container assistant-right-container">
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0 }}>
 
               {/* Header */}
@@ -648,13 +700,41 @@ export default function AssistantTab({ API_BASE: _API_BASE, showAlert, showConfi
                               </tbody>
                             </table>
 
-                            {/* Done button */}
+                            {/* Doctor's remark for assistant */}
+                            {visit.next_visit_plan && (
+                              <div style={{
+                                background: 'rgba(245,158,11,0.08)',
+                                border: '1.5px solid rgba(245,158,11,0.35)',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                marginTop: '10px',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '8px',
+                                fontSize: '0.83rem',
+                              }}>
+                                <span style={{ fontSize: '1rem', flexShrink: 0 }}>📝</span>
+                                <div>
+                                  <div style={{ fontWeight: '700', color: '#b45309', marginBottom: '2px', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Doctor's Remark</div>
+                                  <div style={{ color: '#78350f', lineHeight: 1.45 }}>{visit.next_visit_plan}</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Print and completion actions */}
                             {!isDone && (
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px', gap: '8px' }}>
                                 <button
+                                  className="btn btn-secondary"
+                                  style={{ padding: '9px 16px', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '7px' }}
+                                  onClick={(e) => { e.stopPropagation(); handlePrintDispensing(visit); }}
+                                >
+                                  <Printer size={16} /> Print
+                                </button>
+                                <button
                                   className="btn btn-primary"
                                   style={{ padding: '9px 24px', fontSize: '0.9rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '7px' }}
-                                  onClick={() => handleDone(visit.id)}
+                                  onClick={(e) => { e.stopPropagation(); handleDone(visit.id); }}
                                 >
                                   <Check size={16} /> Done — Medicines Given
                                 </button>

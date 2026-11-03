@@ -122,6 +122,17 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   // Print document modal
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  // Confirm prescription modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmRemark, setConfirmRemark] = useState('');
+
+  // Success + SMS prompt modal
+  const [showSmsPrompt, setShowSmsPrompt] = useState(false);
+  const [showSmsComposer, setShowSmsComposer] = useState(false);
+  const [smsPromptPhone, setSmsPromptPhone] = useState('');
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
+
   // Patients in queue
   const [queue, setQueue] = useState([]);
   const [activeVisit, setActiveVisit] = useState(null); // The visit currently open
@@ -214,6 +225,27 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   useEffect(() => {
     fetchQueue();
     fetchStats();
+  }, []);
+
+  // Keep the doctor queue in sync when an assistant registers a patient.
+  useEffect(() => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('gp_clinic_token')
+      : '';
+    if (!token) return undefined;
+
+    const eventSource = new EventSource(
+      `${API_BASE}/queue/events?token=${encodeURIComponent(token)}`
+    );
+    eventSource.addEventListener('queue:update', fetchQueue);
+    eventSource.onerror = () => {
+      // EventSource automatically reconnects; no polling is needed while it does so.
+    };
+
+    return () => {
+      eventSource.removeEventListener('queue:update', fetchQueue);
+      eventSource.close();
+    };
   }, []);
 
   // Fetch history when selected patient changes
@@ -564,18 +596,23 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
     clearLabsForm();
   };
 
-  // Complete / Register & Complete Visit Logic
+  // Opens the confirmation modal
   const handleConfirmAndSend = async () => {
     if (!searchName || !searchTel) {
       await showAlert('Please select or fill out Name and Telephone number first.', 'Validation Error');
       return;
     }
+    setConfirmRemark('');
+    setShowConfirmModal(true);
+  };
 
+  // Actually finalizes the visit after modal confirmation
+  const handleDoConfirm = async () => {
+    setShowConfirmModal(false);
     try {
       let patientIdToUse = selectedPatient?.id;
       let visitIdToUse = activeVisit?.id;
 
-      // 1. If patient doesn't exist yet, register them on the fly
       if (!selectedPatient) {
         const calculatedAge = (parseInt(ageY) || 0) + (parseInt(ageM) || 0) / 12;
         const newPatient = await apiFetch('/patients', {
@@ -592,7 +629,6 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         setSelectedPatient(newPatient);
       }
 
-      // 2. If no active visit today exists, register a new visit row in database
       if (!visitIdToUse) {
         const newVisit = await apiFetch('/queue', {
           method: 'POST',
@@ -601,11 +637,12 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         visitIdToUse = newVisit.id;
       }
 
-      // 3. Complete the visit by submitting diagnostics
+      const combinedPlan = [nextVisitPlan, confirmRemark].filter(Boolean).join(' | ');
+
       const payload = {
         diagnosis,
         next_visit_date: nextVisitDate || null,
-        next_visit_plan: nextVisitPlan,
+        next_visit_plan: combinedPlan,
         total_fee: totalBill,
         paid_amount: totalBill,
         is_foc: isFoc,
@@ -621,10 +658,13 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
         body: JSON.stringify(payload)
       });
 
-      await showAlert('Patient visit completed successfully!', 'Consultation Finalized');
       fetchQueue();
       fetchStats();
       if (patientIdToUse) fetchPatientHistory(patientIdToUse);
+
+      // Show success + SMS prompt
+      setSmsPromptPhone(searchTel || '');
+      setShowSmsPrompt(true);
 
     } catch (err) {
       console.error(err);
@@ -635,6 +675,53 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
   const handlePrintPrescription = () => {
     // Open the print document selection modal
     setShowPrintModal(true);
+  };
+
+  const handleSendSmsAfterConfirm = async () => {
+    if (!smsPromptPhone) {
+      await showAlert('No phone number available for this patient.', 'SMS Error');
+      setShowSmsPrompt(false);
+      return;
+    }
+    setSmsMessage(`Dear ${searchName || 'Patient'},\nPlease visit ${clinicName || 'our clinic'} for your next clinic appointment.\nThank You.`);
+    setShowSmsPrompt(false);
+    setShowSmsComposer(true);
+  };
+
+  const applySmsTemplate = (template) => {
+    const patient = searchName || 'Patient';
+    const date = nextVisitDate || visitDateText || new Date().toISOString().split('T')[0];
+    const clinic = clinicName || 'our clinic';
+    const templates = {
+      clinic: `Dear ${patient},\nPlease visit ${clinic} for your next clinic appointment.\nThank You.`,
+      visit: `Dear ${patient},\nYour next visit is planned on ${date}.\nThank You.`,
+      bill: `Dear ${patient},\nToday your medication bill is ${isFoc ? 'Free of Charge' : `Rs. ${totalBill.toFixed(0)}`}\nDate: ${visitDateText}\nGet well soon & Thank you`
+    };
+    setSmsMessage(templates[template]);
+  };
+
+  const handleSendSms = async () => {
+    if (!smsPromptPhone.trim()) {
+      await showAlert('Please enter a recipient phone number.', 'SMS Error');
+      return;
+    }
+    if (!smsMessage.trim()) {
+      await showAlert('Please enter a message before sending.', 'SMS Error');
+      return;
+    }
+    setSmsSending(true);
+    try {
+      await apiFetch('/sms/send', {
+        method: 'POST',
+        body: JSON.stringify({ contact: smsPromptPhone.trim(), message: smsMessage.trim() })
+      });
+      setShowSmsComposer(false);
+      await showAlert('SMS sent successfully!', 'SMS Sent');
+    } catch (err) {
+      await showAlert(err.message || 'Failed to send SMS', 'SMS Error');
+    } finally {
+      setSmsSending(false);
+    }
   };
 
   // Print a historical visit's prescription directly
@@ -652,8 +739,23 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
       prescriptions: visit.prescriptions || [],
       planOfAction: visit.next_visit_plan || ''
     });
-    const win = window.open('', '_blank');
-    if (win) { win.document.write(html); win.document.close(); }
+    // Use hidden iframe to print without opening a new tab
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open(); iframeDoc.write(html); iframeDoc.close();
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 1500);
+    };
+    iframe.contentWindow.onload = doPrint;
+    setTimeout(doPrint, 400);
+    if (false) { /* old new-tab print — removed */ }
   };
 
   // Load a historical visit's prescription into the current form
@@ -686,7 +788,9 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           background: 'rgba(0,100,200,0.05)',
           border: '1px solid rgba(0,100,200,0.12)',
           borderRadius: '20px',
-          padding: '5px 16px'
+          padding: '5px 16px',
+          flexWrap: 'wrap',
+          gap: '8px'
         }}>
           <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
             <h3 style={{ fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>Doctor Panel</h3>
@@ -694,24 +798,26 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              background: 'rgba(16,185,129,0.12)',
-              color: '#059669',
-              border: '1.5px solid rgba(16,185,129,0.35)',
-              padding: '3px 10px',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              background: 'rgba(2,132,199,0.12)',
+              color: '#075985',
+              border: '1.5px solid rgba(2,132,199,0.4)',
+              padding: '5px 12px',
               borderRadius: '20px',
-              letterSpacing: '0.2px'
+              letterSpacing: '0.25px',
+              whiteSpace: 'nowrap'
             }}>
               <span style={{
-                width: 7, height: 7,
+                width: 9, height: 9,
                 borderRadius: '50%',
-                background: '#10b981',
+                background: '#0284c7',
                 display: 'inline-block',
-                boxShadow: '0 0 0 2px rgba(16,185,129,0.3)',
+                boxShadow: '0 0 0 2px rgba(2,132,199,0.25)',
                 animation: 'queuePulse 1.8s ease-in-out infinite'
               }} />
-              Active Queue: {queue.length} Patients
+              <span>Active patient:</span>
+              <strong style={{ color: '#0369a1', fontSize: '1.05rem' }}>{queue.length}</strong>
             </span>
           </div>
 
@@ -746,7 +852,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
           <section className="left-scroll-container">
 
             {/* Dropdowns Block */}
-            <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '14px' }}>
+            <div className="glass-panel" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', padding: '14px' }}>
               <div>
                 <label className="label-glass" style={{ fontSize: '0.85rem' }}>Select from queue</label>
                 <select
@@ -1002,7 +1108,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               </div>
 
               {/* Date Picker & Visit priority / Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px', marginTop: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Calendar size={16} style={{ opacity: 0.5, flexShrink: 0 }} />
                   <input
@@ -1072,7 +1178,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
             </div>
 
             {/* Last Visit Details Dropdown - Enhanced */}
-            <div className="glass-panel" style={{ padding: '14px 20px' }}>
+            <div className="glass-panel" style={{ padding: '14px 15px' }}>
               <div
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
@@ -1107,113 +1213,179 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               </div>
 
               {showLastVisitDropdown && (
-                <div style={{ marginTop: '12px', maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '2px' }}>
+                <div style={{ marginTop: '12px', maxHeight: '480px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
                   {history.length === 0 ? (
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', textAlign: 'center' }}>No previous visit records found.</div>
                   ) : (
                     history.map((h, i) => {
-                      const isExpanded = expandedVisitId === h.id;
+                      const isExpanded = i === 0 ? true : expandedVisitId === h.id;
                       const visitDate = new Date(h.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                       const hasMeds = h.prescriptions && h.prescriptions.length > 0;
+                      // Split dosage string "qty freq" -> qty part and freq part
+                      const parseDosage = (dosageStr) => {
+                        if (!dosageStr) return { qty: '-', freq: '-' };
+                        const parts = dosageStr.trim().split(/\s+/);
+                        if (parts.length >= 2) return { qty: parts[0], freq: parts.slice(1).join(' ') };
+                        return { qty: '1', freq: parts[0] };
+                      };
                       return (
                         <div key={h.id} style={{
-                          background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.15)',
-                          border: i === 0 ? '1px solid rgba(0,153,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
-                          borderRadius: '10px', fontSize: '0.85rem', overflow: 'hidden'
+                          background: i === 0 ? 'rgba(0,153,255,0.06)' : 'rgba(0,0,0,0.12)',
+                          border: i === 0 ? '1.5px solid rgba(0,153,255,0.28)' : '1px solid rgba(255,255,255,0.07)',
+                          borderRadius: '12px', fontSize: '0.85rem', overflow: 'hidden'
                         }}>
-                          {/* Visit card header */}
-                          <div style={{ padding: '10px 12px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{
-                                  width: '8px', height: '8px', borderRadius: '50%',
-                                  background: i === 0 ? '#10b981' : '#64748b', display: 'inline-block', flexShrink: 0
-                                }} />
-                                <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{visitDate}</strong>
-                                {i === 0 && (
-                                  <span style={{ fontSize: '0.68rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '1px 6px', borderRadius: '6px', fontWeight: '700' }}>LAST VISIT</span>
-                                )}
-                              </div>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}</span>
-                            </div>
 
-                            <div style={{ marginBottom: '8px' }}>
-                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                                <strong style={{ color: 'var(--text-primary)' }}>Diagnosis:</strong> {h.diagnosis || 'General Checkup'}
+                          {/* Visit header bar — date | separator | fee */}
+                          <div style={{
+                            background: i === 0 ? 'linear-gradient(135deg, rgba(0,140,220,0.55), rgba(0,100,180,0.45))' : 'rgba(255,255,255,0.05)',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
+                              <span style={{
+                                width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                background: i === 0 ? '#0b583fff' : '#64748b',
+                                boxShadow: i === 0 ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none'
+                              }} />
+                              <strong style={{ color: i === 0 ? '#fff' : 'var(--text-primary)', fontSize: '0.92rem', letterSpacing: '0.3px' }}>
+                                {visitDate}
+                              </strong>
+                              <span style={{ color: i === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', fontSize: '1rem' }}>|</span>
+                              <span style={{
+                                fontSize: '0.8rem',
+                                color: i === 0 ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)',
+                                fontWeight: '600'
+                              }}>
+                                Rs. {(parseFloat(h.total_fee) || 0).toFixed(0)}
                               </span>
+                              {i === 0 && (
+                                <span style={{
+                                  fontSize: '0.65rem', background: 'rgba(16,185,129,0.25)', color: '#063525ff',
+                                  padding: '2px 7px', borderRadius: '8px', fontWeight: '700', letterSpacing: '0.5px',
+                                  border: '1px solid rgba(1, 29, 20, 0.4)'
+                                }}>LAST VISIT</span>
+                              )}
                             </div>
+                            {/* Expand/collapse toggle for older visits */}
+                            {i > 0 && (
+                              <button
+                                onClick={() => setExpandedVisitId(expandedVisitId === h.id ? null : h.id)}
+                                style={{
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  color: 'var(--text-muted)', padding: '2px 4px', borderRadius: '4px'
+                                }}
+                              >
+                                {expandedVisitId === h.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </button>
+                            )}
+                          </div>
 
-                            {/* Expandable prescription table */}
-                            {hasMeds && (
-                              <div>
-                                <button
-                                  onClick={() => setExpandedVisitId(isExpanded ? null : h.id)}
-                                  style={{
-                                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
-                                    color: 'var(--text-secondary)', fontSize: '0.75rem',
-                                    display: 'flex', alignItems: 'center', gap: '4px', marginBottom: isExpanded ? '8px' : '0'
-                                  }}
-                                >
-                                  {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                  {h.prescriptions.length} Medicine(s)
-                                </button>
+                          {/* Body — only shown when expanded */}
+                          {isExpanded && (
+                            <div style={{ padding: '10px 14px' }}>
 
-                                {isExpanded && (
-                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', marginBottom: '4px' }}>
+                              {/* Diagnosis badge */}
+                              <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'flex-start', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-secondary)',
+                                  background: 'rgba(0,153,255,0.12)', border: '1px solid rgba(0,153,255,0.22)',
+                                  padding: '2px 8px', borderRadius: '6px', flexShrink: 0, alignSelf: 'flex-start', marginTop: '1px'
+                                }}>Diagnosis :</span>
+                                <span style={{ color: 'var(--text-primary)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                                  {h.diagnosis || 'General Checkup'}
+                                </span>
+                              </div>
+
+                              {/* Medicine table — 4 columns: Medicine | Dos- | Tabs | Dur- */}
+                              {hasMeds && (
+                                <div style={{ overflowX: 'auto' }}>
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: '8px', tableLayout: 'fixed' }}>
+                                    <colgroup>
+                                      <col style={{ width: '42%' }} />
+                                      <col style={{ width: '22%' }} />
+                                      <col style={{ width: '18%' }} />
+                                      <col style={{ width: '18%' }} />
+                                    </colgroup>
                                     <thead>
-                                      <tr style={{ background: 'rgba(0,153,255,0.08)', borderBottom: '1px solid rgba(0,153,255,0.15)' }}>
-                                        <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Drug</th>
-                                        <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Dosage</th>
-                                        <th style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600' }}>Durat..</th>
+                                      <tr style={{ background: 'rgba(0,0,0,0.18)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <th style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Medicine</th>
+                                        <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Dos-</th>
+                                        <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Tabs</th>
+                                        <th style={{ padding: '6px 6px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: '600', fontSize: '0.75rem' }}>Dur-</th>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {h.prescriptions.map((rx, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                          <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: '500' }}>{rx.medicine_name}</td>
-                                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--color-secondary)' }}>{rx.dosage}</td>
-                                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{rx.duration_days}</td>
-                                        </tr>
-                                      ))}
+                                      {h.prescriptions.map((rx, idx) => {
+                                        const { qty, freq } = parseDosage(rx.dosage);
+                                        return (
+                                          <tr key={idx} style={{
+                                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                            background: idx % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent'
+                                          }}>
+                                            <td style={{
+                                              padding: '7px 10px', color: 'var(--text-primary)', fontWeight: '500',
+                                              fontSize: '0.82rem', wordBreak: 'break-word', lineHeight: 1.3
+                                            }}>{rx.medicine_name}</td>
+                                            <td style={{
+                                              padding: '7px 6px', textAlign: 'center', color: 'var(--color-secondary)',
+                                              fontWeight: '600', fontSize: '0.82rem'
+                                            }}>{freq}</td>
+                                            <td style={{
+                                              padding: '7px 6px', textAlign: 'center', color: 'var(--text-primary)',
+                                              fontWeight: '600', fontSize: '0.82rem'
+                                            }}>{qty}</td>
+                                            <td style={{
+                                              padding: '7px 6px', textAlign: 'center', color: 'var(--text-secondary)',
+                                              fontWeight: '500', fontSize: '0.82rem'
+                                            }}>{rx.duration_days}</td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
-                                )}
-                              </div>
-                            )}
+                                </div>
+                              )}
 
-                            {/* Action buttons */}
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                              <button
-                                onClick={() => handlePrintHistoryVisit(h)}
-                                style={{
-                                  flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                                  borderRadius: '6px', padding: '6px 8px', cursor: 'pointer',
-                                  color: 'var(--text-secondary)', fontSize: '0.75rem',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                                  transition: 'all 0.2s'
-                                }}
-                                title="Print this prescription"
-                              >
-                                <Printer size={12} /> Print
-                              </button>
-                              <button
-                                onClick={() => handleRepeatPrescription(h)}
-                                disabled={!hasMeds}
-                                style={{
-                                  flex: 2, background: hasMeds ? 'rgba(0,153,255,0.12)' : 'rgba(0,0,0,0.1)',
-                                  border: `1px solid ${hasMeds ? 'rgba(0,153,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
-                                  borderRadius: '6px', padding: '6px 10px', cursor: hasMeds ? 'pointer' : 'not-allowed',
-                                  color: hasMeds ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.75rem',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                                  opacity: hasMeds ? 1 : 0.5, transition: 'all 0.2s'
-                                }}
-                                title="Use this prescription for current visit"
-                              >
-                                <Copy size={12} /> Use this Prescription
-                              </button>
+                              {!hasMeds && (
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '8px' }}>No medicines prescribed.</div>
+                              )}
+
+                              {/* Action buttons */}
+                              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                <button
+                                  onClick={() => handlePrintHistoryVisit(h)}
+                                  style={{
+                                    flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                                    borderRadius: '6px', padding: '6px 8px', cursor: 'pointer',
+                                    color: 'var(--text-secondary)', fontSize: '0.75rem',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  title="Print this prescription"
+                                >
+                                  <Printer size={12} /> Print
+                                </button>
+                                <button
+                                  onClick={() => handleRepeatPrescription(h)}
+                                  disabled={!hasMeds}
+                                  style={{
+                                    flex: 2, background: hasMeds ? 'rgba(0,153,255,0.12)' : 'rgba(0,0,0,0.1)',
+                                    border: `1px solid ${hasMeds ? 'rgba(0,153,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                                    borderRadius: '6px', padding: '6px 10px', cursor: hasMeds ? 'pointer' : 'not-allowed',
+                                    color: hasMeds ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.75rem',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                    opacity: hasMeds ? 1 : 0.5, transition: 'all 0.2s'
+                                  }}
+                                  title="Use this prescription for current visit"
+                                >
+                                  <Copy size={12} /> Use this Prescription
+                                </button>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })
@@ -1330,7 +1502,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click patient to consult</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
                 {queue.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No patients waiting.</p>
                 ) : (
@@ -1372,7 +1544,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
               {/* Quick Drug Add row — Medicine Name has integrated inventory search */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1.6fr 0.9fr 1fr 90px',
+                gridTemplateColumns: 'minmax(140px,2fr) minmax(120px,1.6fr) minmax(60px,0.9fr) minmax(70px,1fr) 80px',
                 gap: '8px',
                 background: 'rgba(0,0,0,0.1)',
                 padding: '14px',
@@ -1571,7 +1743,7 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                 flexDirection: 'column',
                 gap: '12px'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <label className="label-glass" style={{ margin: 0 }}>Consult Fee</label>
                     <input
@@ -1827,6 +1999,314 @@ export default function DoctorTab({ API_BASE, prescriptionDesign, clinicName, cl
                 }}
               >
                 Ok
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Success + SMS Prompt Modal ── */}
+      {showSmsPrompt && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15,23,42,0.45)',
+          backdropFilter: 'blur(7px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '22px',
+            padding: '36px 32px 28px',
+            width: '100%',
+            maxWidth: '360px',
+            boxShadow: '0 28px 64px rgba(0,0,0,0.22)',
+            textAlign: 'center',
+            animation: 'pdmFadeIn 0.2s ease-out'
+          }}>
+            {/* Green check circle */}
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'rgba(16,185,129,0.12)',
+              border: '3px solid #10b981',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              fontSize: '2rem'
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13l4 4L19 7" stroke="#10b981" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#00b4d8', marginBottom: '12px' }}>
+              Successful
+            </div>
+
+            {/* Info */}
+            <div style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.7, marginBottom: '18px' }}>
+              Patient updated successfully<br />
+              Bill Send to Assistant
+              <br /><br />
+              <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>Do You Want to Send SMS ?</strong>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '0 -32px 20px' }} />
+
+            {/* Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                onClick={handleSendSmsAfterConfirm}
+                disabled={smsSending}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#00b4d8',
+                  fontSize: '0.97rem',
+                  fontWeight: 700,
+                  cursor: smsSending ? 'not-allowed' : 'pointer',
+                  padding: '10px',
+                  fontFamily: 'inherit',
+                  opacity: smsSending ? 0.6 : 1,
+                  transition: 'opacity 0.15s'
+                }}
+              >
+                {smsSending ? 'Sending...' : 'Yes'}
+              </button>
+              <button
+                onClick={() => setShowSmsPrompt(false)}
+                disabled={smsSending}
+                style={{
+                  background: '#f1f5f9',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  color: '#334155',
+                  fontSize: '0.97rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: '10px',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.target.style.background = '#f1f5f9'}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── SMS Message Composer ── */}
+      {showSmsComposer && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget && !smsSending) setShowSmsComposer(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10000,
+            background: 'rgba(15,23,42,0.5)',
+            backdropFilter: 'blur(7px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '20px',
+            padding: '24px 28px 18px',
+            width: '100%',
+            maxWidth: '570px',
+            boxShadow: '0 28px 64px rgba(0,0,0,0.25)',
+            animation: 'pdmFadeIn 0.2s ease-out'
+          }}>
+            <h3 style={{ margin: '0 0 24px', fontSize: '1.35rem', color: '#d47b64', fontWeight: 800 }}>
+              Send SMS
+            </h3>
+
+            <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '1rem' }}>
+              Recipient
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) minmax(0, 1.5fr)', gap: '18px', alignItems: 'center', marginBottom: '12px' }}>
+              <input
+                type="tel"
+                value={smsPromptPhone}
+                onChange={e => setSmsPromptPhone(e.target.value)}
+                style={{ width: '100%', padding: '12px 14px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', color: '#334155', fontSize: '0.95rem', outline: 'none', boxShadow: '0 3px 12px rgba(15,23,42,0.08)' }}
+              />
+              <span style={{ color: '#64748b', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {searchName || 'Patient'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              {[
+                ['clinic', 'Next Clinic'],
+                ['visit', 'Next Visit'],
+                ['bill', 'Bill']
+              ].map(([template, text]) => (
+                <button
+                  key={template}
+                  type="button"
+                  onClick={() => applySmsTemplate(template)}
+                  disabled={smsSending}
+                  style={{
+                    background: '#ffffff',
+                    border: '2px solid #73b8d0',
+                    borderRadius: '11px',
+                    padding: '9px 18px',
+                    color: '#2698d4',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: smsSending ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+
+            <label style={{ display: 'block', marginBottom: '8px', color: '#64748b', fontSize: '1rem' }}>
+              Message
+            </label>
+            <textarea
+              value={smsMessage}
+              onChange={e => setSmsMessage(e.target.value)}
+              rows={7}
+              disabled={smsSending}
+              style={{ width: '100%', resize: 'vertical', minHeight: '150px', padding: '14px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', color: '#475569', fontSize: '1rem', lineHeight: 1.5, outline: 'none', fontFamily: 'inherit', boxShadow: '0 3px 12px rgba(15,23,42,0.08)', boxSizing: 'border-box' }}
+            />
+
+            <div style={{ display: 'flex', gap: '8px', margin: '8px 0 20px' }}>
+              <span style={{ background: '#8b949b', color: '#ffffff', borderRadius: '16px', padding: '5px 12px', fontSize: '0.8rem' }}>
+                Chars: {smsMessage.length}
+              </span>
+              <span style={{ background: '#58a362', color: '#ffffff', borderRadius: '16px', padding: '5px 12px', fontSize: '0.8rem' }}>
+                Pages: {Math.max(1, Math.ceil(smsMessage.length / 160))}/9
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px' }}>
+              <button
+                type="button"
+                onClick={handleSendSms}
+                disabled={smsSending}
+                style={{ padding: '11px', border: 'none', borderRadius: '8px', background: '#209cc1', color: '#ffffff', fontSize: '1rem', fontWeight: 700, cursor: smsSending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: smsSending ? 0.65 : 1 }}
+              >
+                {smsSending ? 'Sending...' : 'Send'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSmsComposer(false)}
+                disabled={smsSending}
+                style={{ padding: '11px', border: 'none', borderRadius: '8px', background: '#209cc1', color: '#ffffff', fontSize: '1rem', fontWeight: 700, cursor: smsSending ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: smsSending ? 0.65 : 1 }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Confirm Prescription Modal ── */}
+      {showConfirmModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowConfirmModal(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(15,23,42,0.5)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '20px',
+            padding: '28px 28px 22px',
+            width: '100%',
+            maxWidth: '380px',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+            animation: 'pdmFadeIn 0.18s ease-out'
+          }}>
+            {/* Title */}
+            <h3 style={{ margin: '0 0 14px', fontSize: '1.18rem', fontWeight: 800, color: '#e05c1a' }}>
+              Confirm Prescription
+            </h3>
+
+            {/* Total */}
+            <div style={{ fontSize: '0.95rem', color: '#334155', marginBottom: '14px' }}>
+              Total : <strong style={{ color: '#0f172a' }}>{isFoc ? 'FOC' : `${totalBill.toFixed(0)}`}</strong>
+            </div>
+
+            {/* Remark label */}
+            <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '7px', fontWeight: 500 }}>
+              Remark for assistant <span style={{ color: '#94a3b8' }}>(optional)</span>
+            </div>
+
+            {/* Remark textarea */}
+            <textarea
+              rows={4}
+              placeholder="Enter Your Remark here....."
+              value={confirmRemark}
+              onChange={(e) => setConfirmRemark(e.target.value)}
+              style={{
+                width: '100%',
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '10px 13px',
+                fontSize: '0.88rem',
+                color: '#1e293b',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                outline: 'none',
+                boxSizing: 'border-box',
+                marginBottom: '18px',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => e.target.style.borderColor = '#38bdf8'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+
+            {/* Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                onClick={handleDoConfirm}
+                style={{
+                  background: 'linear-gradient(135deg, #0077e6, #0099ff)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '11px',
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'opacity 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.opacity = '0.88'}
+                onMouseLeave={e => e.target.style.opacity = '1'}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '11px',
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => e.target.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.target.style.background = '#f1f5f9'}
+              >
+                ← Edit
               </button>
             </div>
           </div>

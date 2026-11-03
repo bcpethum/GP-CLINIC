@@ -197,7 +197,7 @@ export default function Navigation({ activeTab, setActiveTab }) {
             <img src="/Suwa sahana.jpg" alt="GP Clinic Logo"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
+          <span className="nav-brand-text" style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
             GP CLINIC
           </span>
         </div>
@@ -277,10 +277,10 @@ export default function Navigation({ activeTab, setActiveTab }) {
                 {isDoctor ? <ShieldCheck size={15} color="white" /> : <User size={15} color="white" />}
               </div>
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a', lineHeight: 1.2 }}>
+                <div className="nav-user-name" style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a', lineHeight: 1.2 }}>
                   {displayName}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: isDoctor ? 'var(--color-primary)' : '#7c3aed', fontWeight: '600' }}>
+                <div className="nav-user-role" style={{ fontSize: '0.75rem', color: isDoctor ? 'var(--color-primary)' : '#7c3aed', fontWeight: '600' }}>
                   {isDoctor ? 'Doctor' : 'Assistant'}
                 </div>
               </div>

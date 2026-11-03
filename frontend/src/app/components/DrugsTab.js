@@ -225,7 +225,7 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
           <h4 style={{ marginBottom: '14px', color: 'var(--color-secondary)' }}>Register New Drug Asset</h4>
           <form onSubmit={handleAddDrug} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Row 1: Drug info */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px' }}>
               <div>
                 <label className="label-glass">Drug Name</label>
                 <input type="text" className="input-glass" placeholder="e.g. Paracetamol 500mg" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -264,13 +264,13 @@ export default function DrugsTab({ API_BASE, showAlert, showConfirm }) {
 
             {/* Row 2: Default Dosage */}
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1.4fr',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
               gap: '14px', padding: '14px',
               background: 'rgba(0,119,230,0.06)',
               border: '1px solid rgba(0,119,230,0.18)',
               borderRadius: '10px'
             }}>
-              <div style={{ gridColumn: 'span 4', marginBottom: '-4px' }}>
+              <div style={{ gridColumn: '1 / -1', marginBottom: '-4px' }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Default Dosage (auto-fills when selected in Doctor tab)
                 </span>

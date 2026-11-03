@@ -616,7 +616,9 @@ export function buildPrescriptionHtml({
 /**
  * Shared header HTML used across all document types.
  */
-function buildSharedHeaderHtml(config, visitDate, refNo) {
+function buildSharedHeaderHtml(config, visitDate, refNo, removeHeader = false) {
+  if (removeHeader) return '';
+
   const defaultLogoSvg = `
     <svg width="110" height="110" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="100" height="100" rx="16" fill="#f8fafc"/>
@@ -654,7 +656,9 @@ function buildSharedHeaderHtml(config, visitDate, refNo) {
 /**
  * Shared footer (seal + signature + badge) for all document types.
  */
-function buildSharedFooterHtml(config, visitDate) {
+function buildSharedFooterHtml(config, visitDate, removeFooter = false) {
+  if (removeFooter) return '';
+
   return `
     <div class="bottom-sign-area">
       <div class="sign-left-col">
@@ -753,11 +757,18 @@ export function buildMedicalCertificateHtml({
   visitDate = new Date().toISOString().split('T')[0],
   queueNumber = 1,
   diagnosis = '',
-  referralNote = ''
+  referralNote = '',
+  residenceType = '',
+  residencePlace = '',
+  fromDate = '',
+  toDate = '',
+  signsSymptoms = '',
+  removeHeader = false,
+  removeFooter = false
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
-  const header = buildSharedHeaderHtml(config, visitDate, refNo);
-  const footer = buildSharedFooterHtml(config, visitDate);
+  const header = buildSharedHeaderHtml(config, visitDate, refNo, removeHeader);
+  const footer = buildSharedFooterHtml(config, visitDate, removeFooter);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Medical Certificate - ${config.clinicName}</title>
   <style>${baseDocCss()}</style></head>
@@ -768,7 +779,15 @@ export function buildMedicalCertificateHtml({
     <div class="patient-info-block">
       <div class="patient-row"><span class="patient-label">Name :</span><span class="patient-val">${patientName}</span></div>
       ${ageText ? `<div class="patient-row"><span class="patient-label">Age :</span><span class="patient-val">${ageText}</span></div>` : ''}
+      ${residenceType || residencePlace ? `<div class="patient-row"><span class="patient-label">${residenceType || 'Place'} :</span><span class="patient-val">${residencePlace}</span></div>` : ''}
+      ${fromDate || toDate ? `<div class="patient-row"><span class="patient-label">Leave :</span><span class="patient-val">${fromDate || '—'} to ${toDate || '—'}</span></div>` : ''}
     </div>
+    ${signsSymptoms ? `
+      <div style="margin-bottom:14px;">
+        <div class="section-label">Signs and Symptoms</div>
+        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:14px; background:#f8fafc;">${signsSymptoms}</div>
+      </div>
+    ` : ''}
     <p style="font-size:13px; color:#334155; margin-bottom:16px;">
       This is to certify that the above named patient was examined by me on <strong>${visitDate}</strong>
       and found to be suffering from / in the condition noted below.
@@ -804,11 +823,17 @@ export function buildMedicalBillHtml({
   prescriptions = [],
   consultationFee = 0,
   totalBill = 0,
-  isFoc = false
+  isFoc = false,
+  detailedBill = false,
+  includeNextVisit = false,
+  includePastHistory = false,
+  remarks = '',
+  removeHeader = false,
+  removeFooter = false
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
-  const header = buildSharedHeaderHtml(config, visitDate, refNo);
-  const footer = buildSharedFooterHtml(config, visitDate);
+  const header = buildSharedHeaderHtml(config, visitDate, refNo, removeHeader);
+  const footer = buildSharedFooterHtml(config, visitDate, removeFooter);
 
   const drugRows = prescriptions.map((p, i) => `
     <tr style="border-bottom:1px solid #f1f5f9;">
@@ -846,7 +871,7 @@ export function buildMedicalBillHtml({
           <td style="padding:7px 10px; text-align:center;">-</td>
           <td style="padding:7px 10px; text-align:right;">${isFoc ? 'FOC' : `${(parseFloat(consultationFee) || 0).toFixed(2)} LKR`}</td>
         </tr>
-        ${drugRows}
+        ${detailedBill ? drugRows : ''}
       </tbody>
       <tfoot>
         <tr style="background:#f8fafc; border-top:2px solid #cbd5e1;">
@@ -855,6 +880,9 @@ export function buildMedicalBillHtml({
         </tr>
       </tfoot>
     </table>
+    ${remarks ? `<div style="margin-bottom:12px;"><div class="section-label">Remarks</div><div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:13px; background:#f8fafc;">${remarks}</div></div>` : ''}
+    ${includeNextVisit ? '<p style="font-size:12px; color:#64748b;">Next visit date: ____________________</p>' : ''}
+    ${includePastHistory ? '<p style="font-size:12px; color:#64748b;">Past medical history: ____________________</p>' : ''}
     <p style="font-size:11px; color:#94a3b8; text-align:center;">Thank you for choosing ${config.clinicName || 'our clinic'}. Payments are non-refundable.</p>
     ${footer}
   </div></body></html>`;
@@ -872,11 +900,14 @@ export function buildMedicalReportHtml({
   diagnosis = '',
   prescriptions = [],
   referralNote = '',
-  investigations = {}
+  investigations = {},
+  includePastHistory = false,
+  removeHeader = false,
+  removeFooter = false
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
-  const header = buildSharedHeaderHtml(config, visitDate, refNo);
-  const footer = buildSharedFooterHtml(config, visitDate);
+  const header = buildSharedHeaderHtml(config, visitDate, refNo, removeHeader);
+  const footer = buildSharedFooterHtml(config, visitDate, removeFooter);
 
   const invEntries = Object.entries(investigations || {}).filter(([, v]) => v && v.toString().trim());
   const invRows = invEntries.map(([k, v]) => `
@@ -926,6 +957,12 @@ export function buildMedicalReportHtml({
         <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:13px; background:#f8fafc;">${referralNote}</div>
       </div>
     ` : ''}
+    ${includePastHistory ? `
+      <div style="margin-bottom:12px;">
+        <div class="section-label">Past Medical History</div>
+        <div style="min-height:36px; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:13px; background:#f8fafc;">&nbsp;</div>
+      </div>
+    ` : ''}
     ${footer}
   </div></body></html>`;
 }
@@ -941,11 +978,13 @@ export function buildReferralLetterHtml({
   queueNumber = 1,
   diagnosis = '',
   referralNote = '',
-  referralType = 'Referral'
+  referralType = 'Referral',
+  removeHeader = false,
+  removeFooter = false
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
-  const header = buildSharedHeaderHtml(config, visitDate, refNo);
-  const footer = buildSharedFooterHtml(config, visitDate);
+  const header = buildSharedHeaderHtml(config, visitDate, refNo, removeHeader);
+  const footer = buildSharedFooterHtml(config, visitDate, removeFooter);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Referral Letter - ${config.clinicName}</title>
   <style>${baseDocCss()}</style></head>
@@ -991,11 +1030,13 @@ export function buildCustomDocumentHtml({
   patientName = 'Walk-in Patient',
   visitDate = new Date().toISOString().split('T')[0],
   queueNumber = 1,
-  customContent = ''
+  customContent = '',
+  removeHeader = false,
+  removeFooter = false
 }) {
   const refNo = generateReferenceNo(config.refPrefix || 'DW', visitDate, queueNumber);
-  const header = buildSharedHeaderHtml(config, visitDate, refNo);
-  const footer = buildSharedFooterHtml(config, visitDate);
+  const header = buildSharedHeaderHtml(config, visitDate, refNo, removeHeader);
+  const footer = buildSharedFooterHtml(config, visitDate, removeFooter);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Document - ${config.clinicName}</title>
   <style>${baseDocCss()}</style></head>

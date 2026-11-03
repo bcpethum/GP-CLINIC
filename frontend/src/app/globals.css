@@ -220,7 +220,7 @@ select option {
 /* Grid helper */
 .grid-container {
   display: grid;
-  gap: 20px;
+  gap: 14px;
 }
 
 /* Switch Styles */
@@ -393,7 +393,7 @@ input:checked+.slider:before {
   padding: 12px 4px;
   max-width: 1400px;
   margin: 0 auto;
-  gap: 20px;
+  gap: 14px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -403,7 +403,7 @@ input:checked+.slider:before {
   display: flex;
   flex: 1;
   min-height: 0;
-  gap: 20px;
+  gap: 14px;
   overflow: hidden;
 }
 
@@ -425,8 +425,38 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   padding-bottom: 16px;
+}
+
+/* Assistant layout: keep both columns usable and action buttons evenly sized. */
+.assistant-content {
+  display: grid;
+  grid-template-columns: minmax(280px, 38%) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.assistant-left-container,
+.assistant-right-container {
+  min-width: 0;
+}
+
+.assistant-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.assistant-action-grid .btn {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 6px;
+  font-size: 0.85rem;
+  white-space: normal;
+  text-align: center;
 }
 
 /* Responsive: stack columns on tablet / mobile */
@@ -443,6 +473,16 @@ input:checked+.slider:before {
     overflow-y: auto;
     padding-right: 0;
   }
+
+  .assistant-content {
+    display: flex;
+  }
+}
+
+@media (max-width: 520px) {
+  .assistant-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ── Generic full-height tab wrapper (Patients, Drugs, SMS, Dashboard) ── */
@@ -458,7 +498,7 @@ input:checked+.slider:before {
   padding: 12px 4px;
   max-width: 1400px;
   margin: 0 auto;
-  gap: 20px;
+  gap: 14px;
 }
 
 /* Two-column row that fills remaining vertical space */
@@ -466,7 +506,7 @@ input:checked+.slider:before {
   display: flex;
   flex: 1;
   min-height: 0;
-  gap: 20px;
+  gap: 14px;
   overflow: hidden;
 }
 
@@ -487,7 +527,7 @@ input:checked+.slider:before {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   min-height: 0;
   overflow-y: auto;
   padding-bottom: 16px;
@@ -523,4 +563,464 @@ input:checked+.slider:before {
 @keyframes queuePulse {
   0%, 100% { box-shadow: 0 0 0 2px rgba(16,185,129,0.3); }
   50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0.08); }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE ADDITIONS — do not remove or reorder existing blocks
+   ══════════════════════════════════════════════════════════════════ */
+
+/* SMS tab: responsive two-column layout */
+.sms-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 0;
+  min-height: calc(100vh - 70px);
+  background: var(--bg-primary);
+}
+
+/* Prescription designer: two-column controls + preview */
+.prescription-designer-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+/* Expenditure section: 12-column grid that stacks on narrow screens */
+.expenditure-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr; /* repurposed */
+  gap: 14px;
+}
+
+/* ── Tablet: ≤ 1100px ── */
+@media (max-width: 1100px) {
+  .doctor-panel-wrapper,
+  .tab-panel-wrapper {
+    padding: 8px 4px;
+    gap: 14px;
+  }
+
+  .prescription-designer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Tablet / Mobile: ≤ 900px (augments existing blocks) ── */
+@media (max-width: 900px) {
+  body {
+    font-size: 15px;
+  }
+
+  .glass-panel {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .btn {
+    font-size: 0.92rem;
+    padding: 9px 14px;
+    gap: 6px;
+  }
+
+  .input-glass {
+    padding: 10px 12px;
+    font-size: 0.92rem;
+  }
+
+  .label-glass {
+    font-size: 0.85rem;
+  }
+
+  /* Remove the restrictive max-height cap so stacked columns can breathe */
+  .left-scroll-container,
+  .right-scroll-container {
+    max-height: none !important;
+  }
+
+  .doctor-panel-wrapper,
+  .tab-panel-wrapper {
+    padding: 8px 4px;
+    gap: 10px;
+  }
+
+  .tab-scroll-wrapper {
+    padding: 8px 4px 12px;
+  }
+
+  /* SMS layout stacks vertically */
+  .sms-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: auto;
+  }
+
+  /* Expenditure grid stacks to single column */
+  .expenditure-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expenditure-grid > * {
+    grid-column: span 1 !important;
+  }
+
+  /* Dashboard 4 metric cards: 4→2 cols */
+  .dashboard-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Dashboard expenditure logger+table stacks */
+  .dashboard-expenditure {
+    grid-template-columns: 1fr;
+  }
+
+  /* Prescription designer stacks */
+  .prescription-designer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Small mobile: ≤ 600px ── */
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+  }
+
+  .glass-panel {
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .btn {
+    font-size: 0.88rem;
+    padding: 8px 11px;
+    gap: 5px;
+  }
+
+  .input-glass {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+  }
+
+  .label-glass {
+    font-size: 0.8rem;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   NAVIGATION RESPONSIVE ADDITIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Constrain user-badge name so long names don't push nav buttons off-screen */
+.nav-user-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  nav {
+    padding: 8px 14px !important;
+    gap: 10px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  nav {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+
+  /* Nav tab pill strip: tighter padding — targets all buttons inside nav's pill strip */
+  .nav-tab-pill,
+  nav button[style*="borderRadius: '50px'"],
+  nav > div > div > button {
+    padding: 6px 12px !important;
+    font-size: 0.88rem !important;
+  }
+
+  /* User badge: hide role subtitle on small screens */
+  .nav-user-role {
+    display: none;
+  }
+
+  .nav-user-name {
+    max-width: 80px;
+  }
+}
+
+@media (max-width: 600px) {
+  nav {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  /* Hide "GP CLINIC" brand text to save horizontal space */
+  .nav-brand-text {
+    display: none;
+  }
+
+  .nav-tab-pill,
+  nav > div > div > button {
+    padding: 5px 9px !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Shrink icon-only buttons */
+  .nav-bell-btn,
+  .nav-logout-btn {
+    padding: 7px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DOCTOR TAB — PRESCRIPTION ROW & MISC RESPONSIVE
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Prescription quick-add row: at ≤ 700px wrap into 2-col then 1-col */
+@media (max-width: 700px) {
+  /* The 5-column prescription row needs to wrap */
+  .rx-add-row {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+}
+
+/* Ensure tables inside panels can scroll horizontally on small screens */
+@media (max-width: 900px) {
+  table {
+    min-width: 400px;
+  }
+
+  /* Wrap table in a scrollable div by adding overflow to its nearest block parent */
+  .glass-panel {
+    overflow-x: auto;
+  }
+
+  /* But glass-panels that are flex columns should not scroll — only those with tables */
+  .glass-panel[style*="flexDirection: 'column'"],
+  .glass-panel[style*="flex-direction: column"] {
+    overflow-x: visible;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Stack DoctorTab queue stats banner items vertically if needed */
+  .doctor-panel-wrapper > div:first-child {
+    flex-wrap: wrap;
+  }
+
+  /* Reduce prescription table font size */
+  .rx-table td,
+  .rx-table th {
+    font-size: 0.8rem;
+    padding: 6px 8px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   NAVIGATION RESPONSIVE ADDITIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Constrain user-badge name so long names don't push nav buttons off-screen */
+.nav-user-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  nav {
+    padding: 8px 14px !important;
+    gap: 10px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  nav {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+
+  /* Nav tab pill strip: tighter padding — targets all buttons inside nav's pill strip */
+  .nav-tab-pill,
+  nav button[style*="borderRadius: '50px'"],
+  nav > div > div > button {
+    padding: 6px 12px !important;
+    font-size: 0.88rem !important;
+  }
+
+  /* User badge: hide role subtitle on small screens */
+  .nav-user-role {
+    display: none;
+  }
+
+  .nav-user-name {
+    max-width: 80px;
+  }
+}
+
+@media (max-width: 600px) {
+  nav {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  /* Hide "GP CLINIC" brand text to save horizontal space */
+  .nav-brand-text {
+    display: none;
+  }
+
+  .nav-tab-pill,
+  nav > div > div > button {
+    padding: 5px 9px !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Shrink icon-only buttons */
+  .nav-bell-btn,
+  .nav-logout-btn {
+    padding: 7px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DOCTOR TAB — PRESCRIPTION ROW & MISC RESPONSIVE
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Prescription quick-add row: at ≤ 700px wrap into 2-col then 1-col */
+@media (max-width: 700px) {
+  /* The 5-column prescription row needs to wrap */
+  .rx-add-row {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+}
+
+/* Ensure tables inside panels can scroll horizontally on small screens */
+@media (max-width: 900px) {
+  table {
+    min-width: 400px;
+  }
+
+  /* Wrap table in a scrollable div by adding overflow to its nearest block parent */
+  .glass-panel {
+    overflow-x: auto;
+  }
+
+  /* But glass-panels that are flex columns should not scroll — only those with tables */
+  .glass-panel[style*="flexDirection: 'column'"],
+  .glass-panel[style*="flex-direction: column"] {
+    overflow-x: visible;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Stack DoctorTab queue stats banner items vertically if needed */
+  .doctor-panel-wrapper > div:first-child {
+    flex-wrap: wrap;
+  }
+
+  /* Reduce prescription table font size */
+  .rx-table td,
+  .rx-table th {
+    font-size: 0.8rem;
+    padding: 6px 8px;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   DASHBOARD RESPONSIVE ADDITIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 4 metric cards base */
+.dashboard-metric-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* Logger + table side-by-side */
+.dashboard-expenditure {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  /* 4 cards → 2 per row on laptop */
+  .dashboard-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  /* 2 cards per row on tablet */
+  .dashboard-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* Expenditure: stack logger above table */
+  .dashboard-expenditure {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 1 card per row on small mobile */
+  .dashboard-metric-cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DASHBOARD RESPONSIVE ADDITIONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 4 metric cards base */
+.dashboard-metric-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* Logger + table side-by-side */
+.dashboard-expenditure {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  /* 4 cards → 2 per row on laptop */
+  .dashboard-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  /* 2 cards per row on tablet */
+  .dashboard-metric-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* Expenditure: stack logger above table */
+  .dashboard-expenditure {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 1 card per row on small mobile */
+  .dashboard-metric-cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
 }

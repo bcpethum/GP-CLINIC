@@ -191,6 +191,68 @@ router.post('/status', async (req, res) => {
 });
 
 /* ────────────────────────────────────────────────
+   POST /api/sms/reload-credit
+   Create an SMSlenz payment link for a credit top-up.
+   ──────────────────────────────────────────────── */
+router.post('/reload-credit', async (req, res) => {
+  try {
+    const doctorId = await getDoctorId(req);
+    const creds = await resolveCreds(doctorId);
+    if (!creds) {
+      return res.status(400).json({ success: false, message: 'SMS credentials not configured.' });
+    }
+
+    const amount = Number(req.body.amount);
+    if (!Number.isInteger(amount) || amount < 1000 || amount > 100000) {
+      return res.status(400).json({ success: false, message: 'Top-up amount must be a whole number between 1000 and 100000 LKR.' });
+    }
+
+    const reference = typeof req.body.client_reference === 'string'
+      ? req.body.client_reference.trim().slice(0, 64)
+      : '';
+    const data = await smsPost('/reload-credit', {
+      user_id: creds.user_id,
+      api_key: creds.api_key,
+      amount,
+      ...(creds.sender_id && creds.sender_id !== 'SMSlenzDEMO' ? { sender_id: creds.sender_id } : {}),
+      ...(reference ? { client_reference: reference } : {})
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('[SMS] reload credit error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ────────────────────────────────────────────────
+   POST /api/sms/payment-status
+   Check an SMSlenz credit top-up payment.
+   ──────────────────────────────────────────────── */
+router.post('/payment-status', async (req, res) => {
+  try {
+    const doctorId = await getDoctorId(req);
+    const creds = await resolveCreds(doctorId);
+    if (!creds) {
+      return res.status(400).json({ success: false, message: 'SMS credentials not configured.' });
+    }
+    const orderId = typeof req.body.order_id === 'string' ? req.body.order_id.trim() : '';
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'order_id is required.' });
+    }
+
+    const data = await smsPost('/payment-status', {
+      user_id: creds.user_id,
+      api_key: creds.api_key,
+      order_id: orderId
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('[SMS] payment status error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ────────────────────────────────────────────────
    POST /api/sms/send
    Send single SMS
    Body: { contact, message }

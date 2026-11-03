@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, Users, DollarSign, Wallet, Plus, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Calendar, TrendingUp, Users, DollarSign, Wallet, Plus, Trash2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
@@ -28,7 +28,6 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Daily Financial Metrics
       const metricsData = await apiFetch(`/queue/stats?date=${selectedDate}`);
       setMetrics({
         patient_count: metricsData.patient_count,
@@ -37,7 +36,6 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
         net_income: metricsData.net_income
       });
 
-      // 2. Fetch Expenditures list
       const expData = await apiFetch(`/expenditures?date=${selectedDate}`);
       setExpenditures(expData);
     } catch (err) {
@@ -88,103 +86,123 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
   };
 
   return (
-    <div className="tab-scroll-wrapper fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-scroll-wrapper fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Date Filter Panel */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* ── Date Filter Panel ── */}
+      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', padding: '14px 20px' }}>
         <div>
-          <h3 style={{ fontSize: '1.25rem' }}>Practice Analytics</h3>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Realtime dashboard of revenue, volume, and operational logs</span>
+          <h3 style={{ fontSize: '1.15rem', margin: 0 }}>Practice Analytics</h3>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Realtime dashboard of revenue, volume, and operational logs</span>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Calendar size={18} style={{ color: 'var(--color-secondary)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar size={16} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
           <input
             type="date"
             className="input-glass"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            style={{ width: '180px', padding: '6px 12px' }}
+            style={{ width: '160px', padding: '6px 10px', fontSize: '0.9rem' }}
           />
         </div>
       </div>
 
-      {/* Metrics Cards Grid (4 Columns) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '20px'
-      }}>
-        {/* Card 1: Patient count */}
-        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ background: 'rgba(0,153,255,0.15)', padding: '12px', borderRadius: '10px', color: 'var(--color-secondary)' }}>
-            <Users size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Daily Patient Count</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--color-primary)', marginTop: '4px' }}>{metrics.patient_count}</div>
-          </div>
-        </div>
+      {/* ── 4 Metric Cards ── */}
+      <div className="dashboard-metric-cards">
 
-        {/* Card 2: Income */}
-        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ background: 'rgba(16,185,129,0.15)', padding: '12px', borderRadius: '10px', color: 'var(--color-success)' }}>
-            <TrendingUp size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Daily Income</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--color-success)', marginTop: '4px' }}>{metrics.daily_income.toFixed(2)} LKR</div>
-          </div>
-        </div>
-
-        {/* Card 3: Expenditures */}
-        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ background: 'rgba(239,68,68,0.15)', padding: '12px', borderRadius: '10px', color: 'var(--color-danger)' }}>
-            <Wallet size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Daily Expenditure</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--color-danger)', marginTop: '4px' }}>{metrics.daily_expenditure.toFixed(2)} LKR</div>
-          </div>
-        </div>
-
-        {/* Card 4: Net profit */}
-        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden' }}>
+        {/* Card 1: Patient Count */}
+        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
           <div style={{
-            background: metrics.net_income >= 0 ? 'rgba(0, 210, 255, 0.15)' : 'rgba(249, 115, 22, 0.15)',
-            padding: '12px',
+            background: 'rgba(0,153,255,0.12)',
+            padding: '10px',
             borderRadius: '10px',
-            color: metrics.net_income >= 0 ? 'var(--color-secondary)' : 'var(--color-orange)'
+            color: 'var(--color-secondary)',
+            flexShrink: 0
           }}>
-            <DollarSign size={28} />
+            <Users size={24} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Net Operations Margin</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Daily Patient Count</div>
+            <div style={{ fontSize: '1.9rem', fontWeight: 'bold', color: 'var(--color-primary)', lineHeight: 1.2, marginTop: '2px' }}>{metrics.patient_count}</div>
+          </div>
+        </div>
+
+        {/* Card 2: Daily Income */}
+        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
+          <div style={{
+            background: 'rgba(16,185,129,0.12)',
+            padding: '10px',
+            borderRadius: '10px',
+            color: 'var(--color-success)',
+            flexShrink: 0
+          }}>
+            <TrendingUp size={24} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Daily Income</div>
+            <div style={{ fontSize: '1.9rem', fontWeight: 'bold', color: 'var(--color-success)', lineHeight: 1.2, marginTop: '2px' }}>
+              {Number(metrics.daily_income).toFixed(2)}
+              <span style={{ fontSize: '0.85rem', marginLeft: '4px', fontWeight: 600 }}>LKR</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Daily Expenditure */}
+        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
+          <div style={{
+            background: 'rgba(239,68,68,0.12)',
+            padding: '10px',
+            borderRadius: '10px',
+            color: 'var(--color-danger)',
+            flexShrink: 0
+          }}>
+            <Wallet size={24} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Daily Expenditure</div>
+            <div style={{ fontSize: '1.9rem', fontWeight: 'bold', color: 'var(--color-danger)', lineHeight: 1.2, marginTop: '2px' }}>
+              {Number(metrics.daily_expenditure).toFixed(2)}
+              <span style={{ fontSize: '0.85rem', marginLeft: '4px', fontWeight: 600 }}>LKR</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Net Operations Margin */}
+        <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
+          <div style={{
+            background: metrics.net_income >= 0 ? 'rgba(0,210,255,0.12)' : 'rgba(249,115,22,0.12)',
+            padding: '10px',
+            borderRadius: '10px',
+            color: metrics.net_income >= 0 ? 'var(--color-secondary)' : 'var(--color-orange)',
+            flexShrink: 0
+          }}>
+            <DollarSign size={24} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Net Operations Margin</div>
             <div style={{
-              fontSize: '1.8rem',
+              fontSize: '1.9rem',
               fontWeight: 'bold',
               color: metrics.net_income >= 0 ? 'var(--color-secondary)' : 'var(--color-orange)',
-              marginTop: '4px'
+              lineHeight: 1.2,
+              marginTop: '2px'
             }}>
-              {metrics.net_income.toFixed(2)} LKR
+              {Number(metrics.net_income).toFixed(2)}
+              <span style={{ fontSize: '0.85rem', marginLeft: '4px', fontWeight: 600 }}>LKR</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Grid of Expenditures logger & list */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(12, 1fr)',
-        gap: '20px'
-      }}>
+      {/* ── Expenditure Section: Logger + Table ── */}
+      <div className="dashboard-expenditure">
+
         {/* Logger Panel */}
-        <div className="glass-panel" style={{ gridColumn: 'span 4' }}>
-          <h4 style={{ fontSize: '1.1rem', marginBottom: '15px', color: 'var(--text-primary)', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
+        <div className="glass-panel" style={{ padding: '18px' }}>
+          <h4 style={{ fontSize: '1rem', marginBottom: '14px', color: 'var(--text-primary)', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px', margin: '0 0 14px 0' }}>
             Log New Cost / Expenditure
           </h4>
 
-          <form onSubmit={handleAddExpenditure} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <form onSubmit={handleAddExpenditure} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <label className="label-glass">Description</label>
               <input
@@ -205,7 +223,7 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
                 onChange={(e) => setCategory(e.target.value)}
                 style={{ appearance: 'none' }}
               >
-                <option value="Drugs">Drugs & Supply stock</option>
+                <option value="Drugs">Drugs &amp; Supply stock</option>
                 <option value="Supplies">Medical Supplies</option>
                 <option value="Rent">Rent / Lease</option>
                 <option value="Utilities">Utilities (Water, Power, Net)</option>
@@ -227,27 +245,27 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ marginTop: '10px' }}>
-              <Plus size={16} /> Log Expense
+            <button type="submit" className="btn btn-primary" style={{ marginTop: '6px' }}>
+              <Plus size={15} /> Log Expense
             </button>
           </form>
         </div>
 
-        {/* Expenditures list Table */}
-        <div className="glass-panel" style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', padding: 0 }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Expenditures Register</h4>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Date: {selectedDate}</span>
+        {/* Expenditures Table Panel */}
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: 0, minWidth: 0 }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', margin: 0 }}>Expenditures Register</h4>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Date: {selectedDate}</span>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '380px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', textAlign: 'left', minWidth: '360px' }}>
               <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)' }}>
-                  <th style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>Item</th>
-                  <th style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>Category</th>
-                  <th style={{ padding: '12px 20px', color: 'var(--text-secondary)', textAlign: 'right' }}>Amount</th>
-                  <th style={{ padding: '12px 20px', color: 'var(--text-secondary)', textAlign: 'center', width: '80px' }}>Action</th>
+                <tr style={{ background: 'rgba(0,100,200,0.04)', borderBottom: '1px solid var(--glass-border)' }}>
+                  <th style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontWeight: 600 }}>Item</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontWeight: 600 }}>Category</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>Amount</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'center', width: '70px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,23 +281,24 @@ export default function DashboardTab({ API_BASE, showAlert, showConfirm }) {
                   </tr>
                 ) : (
                   expenditures.map(item => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '12px 20px', fontWeight: '500' }}>{item.description}</td>
-                      <td style={{ padding: '12px 20px' }}>
+                    <tr key={item.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                      <td style={{ padding: '10px 16px', fontWeight: '500' }}>{item.description}</td>
+                      <td style={{ padding: '10px 16px' }}>
                         <span style={{
-                          fontSize: '0.75rem',
+                          fontSize: '0.73rem',
                           background: 'rgba(239, 68, 68, 0.1)',
                           color: 'var(--color-danger)',
-                          padding: '3px 8px',
-                          borderRadius: '4px'
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          fontWeight: 600
                         }}>{item.category}</span>
                       </td>
-                      <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-danger)' }}>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-danger)' }}>
                         -{parseFloat(item.amount).toFixed(2)} LKR
                       </td>
-                      <td style={{ padding: '12px 20px', textAlign: 'center' }}>
-                        <button onClick={() => handleDeleteExpenditure(item.id)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer' }}>
-                          <Trash2 size={15} />
+                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <button onClick={() => handleDeleteExpenditure(item.id)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '4px' }}>
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
